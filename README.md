@@ -6,3 +6,13 @@ Boost
 Eigen
 FlANN
 VTK
+
+DataStructure:Uses PCL's core storage structure
+
+Current Features:
+Search Algorithms
+Feature Estimation on Point Cloud
+Registration ALgrotihm ( ICP Based with various discrete correspondence finding)
+
+Evaluation metric Available
+Writes file in .ply file
