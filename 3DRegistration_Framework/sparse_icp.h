@@ -925,8 +925,8 @@ namespace SICP
                     transform = RigidMotionEstimator::point_to_plane(refinedX, Qp, Qn, w, U, transform, distance);
                     /// Stopping criteria
                    // dual = (transform * refinedX - Qp).colwise().norm().maxCoeff();
-                   // dual = (transform * X - Xo1).colwise().norm().maxCoeff();
-                    dual = metric::ComputeRMSE(transform * X, Xo1, par.diagonalLength);
+                   dual = (transform * X - Xo1).colwise().norm().maxCoeff();
+                   // dual = metric::ComputeRMSE(transform * X, Xo1, par.diagonalLength);
                     Xo1 = transform * X;
                     if (dual <= par.stop) break;
                     /*std::pair<double, double>error_pair = tool::GetTransformationError(transform_A, transform.matrix());
@@ -958,8 +958,8 @@ namespace SICP
             optimization_time += executeopto;
 
             /// Stopping criteria
-           // float stop = (transform * X - Xo2).colwise().norm().maxCoeff();
-            float stop =  metric::ComputeRMSE(transform * X, Xo2, par.diagonalLength);
+            float stop = (transform * X - Xo2).colwise().norm().maxCoeff();
+           // float stop =  metric::ComputeRMSE(transform * X, Xo2, par.diagonalLength);
             //std::cout << "stopping criteria:" << stop << endl;
             Xo2 = transform * X;
             auto finishItr = std::chrono::high_resolution_clock::now();

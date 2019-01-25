@@ -265,9 +265,9 @@ void cMLSearch::findPoint(PointRGBNormalType &querypoint, Eigen::Affine3f &trans
         else
             return;
     }
-    PointType qPoint;
+    PointNormalType qPoint;
     qPoint.getVector3fMap() = transform * querypoint.getVector3fMap();  // transformed source
-    Eigen::Vector3f tranformed_source_normal = transform.linear() * querypoint.getNormalVector3fMap();  
+    qPoint.getNormalVector3fMap() = transform.linear() * querypoint.getNormalVector3fMap();
     bool status = false;
     bool mls_corresps = false;
    // bool _curvatureFiltering = true;
@@ -277,7 +277,7 @@ void cMLSearch::findPoint(PointRGBNormalType &querypoint, Eigen::Affine3f &trans
     Eigen::Matrix3Xf pt(3, 1), norm(3, 1);
     PointNormalType pnOld;
     pnOld.getVector3fMap() = qPoint.getVector3fMap();      //querypoint.getVector3fMap();
-    pnOld.getNormalVector3fMap() = tranformed_source_normal; // querypoint.getNormalVector3fMap();
+    pnOld.getNormalVector3fMap() = qPoint.getNormalVector3fMap(); // querypoint.getNormalVector3fMap();
     pcl::PointNormal pnNew;
     float radius = 0.0f;
         if (m_resolution == 0.0f)
@@ -297,7 +297,7 @@ void cMLSearch::findPoint(PointRGBNormalType &querypoint, Eigen::Affine3f &trans
         std::vector<float>weight;
         Eigen::Vector3f ref_domain_origin(0.0f, 0.0f, 0.0f);
         PointType point(pnOld.x, pnOld.y, pnOld.z);
-        if (kdTree->radiusSearch(qPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 4) //point
+        if (kdTree->radiusSearch(point, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 4) //point
         {
             weight = ComputeWeightFromLocalNeighborhood(pnOld, inputTargetPointSet, pointIdxRadiusSearch, WeightFunc, radius);
 
@@ -320,10 +320,10 @@ void cMLSearch::findPoint(PointRGBNormalType &querypoint, Eigen::Affine3f &trans
             executeTime = executeTime / double(1000);
             //std::cout << "Time:" << executeTime << "secs" << std::endl;
             //  compute local reference domain origin
-            ref_domain_origin = ComputeLocalReferenceDomainOrigin(qPoint, eigen_vectors,
+            ref_domain_origin = ComputeLocalReferenceDomainOrigin(pnOld, eigen_vectors,
                 meanOfNeighborhood);  //pnOld
 
-            std::vector<Eigen::Vector3f>localTransfromedPoints = transformNeighborhoodtoLocalFrame(qPoint,
+            std::vector<Eigen::Vector3f>localTransfromedPoints = transformNeighborhoodtoLocalFrame(pnOld,
                 inputTargetPointSet, pointIdxRadiusSearch, meanOfNeighborhood, eigen_vectors, ref_domain_origin); //pnOld
 
             // std::vector<Eigen::Vector3f>LocalToWorld = ReProjectneighborstoWorldFrame(localTransfromedPoints, ref_domain_origin, eigen_vectors);
@@ -352,7 +352,7 @@ void cMLSearch::findPoint(PointRGBNormalType &querypoint, Eigen::Affine3f &trans
                 {
                     eigen_vectors[0] *= -1.0f;
                 }
-                if (tranformed_source_normal.dot(eigen_vectors[0]) >= normal_filter_threshold)
+                if (qPoint.getNormalVector3fMap().dot(eigen_vectors[0]) >= normal_filter_threshold)
                 {
                     if (_curvatureFiltering == true)
                     {
