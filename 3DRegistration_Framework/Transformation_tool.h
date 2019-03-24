@@ -14,7 +14,7 @@ namespace tool
         int ImageWidth;
         int ImageHeight;
     }CameraParameter;
-    REG3D_API CloudWithoutType TransFormationOfCloud(CloudWithoutType &inputCloud, Eigen::Matrix4f transformationMatrix);
+    REG3D_API CloudWithoutType TransFormationOfCloud(CloudWithoutType inputCloud, Eigen::Matrix4f transformationMatrix);
     REG3D_API void writeTransformationMatrix(const std::string &matrixFileName, std::vector<Eigen::Matrix4f> transformationMatrix);
     REG3D_API void writeMatrix(const std::string &matrixFileName, std::vector<Eigen::Matrix4f> transformationMatrix);
     REG3D_API std::vector<Eigen::Affine3f> ReadTransformationMatrix(const std::string &matrixFileName);
@@ -29,10 +29,10 @@ namespace tool
     REG3D_API CloudWithoutType CopyPointWithoutNormal(CloudWithoutType &inputCloud, CloudWithoutType& ModifiedCloud);
     REG3D_API CloudWithoutType CopytNormalWithoutPoint(CloudWithoutType &inputCloud, CloudWithoutType& ModifiedCloud);
 
-    REG3D_API float ComputeOrientedBoundingBoxOfCloud(CloudWithNormalPtr &cloud, Eigen::Vector3f &min_pt, Eigen::Vector3f &max_pt);
+    REG3D_API float ComputeOrientedBoundingBoxOfCloud(CloudWithNormalPtr cloud, Eigen::Vector3f &min_pt, Eigen::Vector3f &max_pt);
     REG3D_API std::pair<double, double> GetTransformationError(Eigen::Matrix4f &GT, Eigen::Matrix4f &CT);
     REG3D_API std::vector<Eigen::Matrix4f> ReadGroundTruthTransFormationFromCSVFile( const std::string &FileName);
-    REG3D_API CloudWithoutType ApplyTransformationToPointCloud(CloudWithoutType &inputCloud, double RotAngleinDeg,  Eigen::Vector3f rotAxis = Eigen::Vector3f::UnitZ(),
+    REG3D_API CloudWithoutType ApplyTransformationToPointCloud(CloudWithoutType& inputCloud, double RotAngleinDeg,  Eigen::Vector3f rotAxis = Eigen::Vector3f::UnitZ(),
         Eigen::Vector3f translation = Eigen::Vector3f::UnitZ());
     REG3D_API Eigen::Matrix4f CreateMatrixFromFixedAngleAndTranslation(const double RotAngleinDeg, Eigen::Vector3f rotAxis = Eigen::Vector3f::UnitZ(),
         Eigen::Vector3f translation = Eigen::Vector3f::UnitZ());

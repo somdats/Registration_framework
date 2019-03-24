@@ -8,7 +8,7 @@
  // i/p: inputCloud
  // i/p : Eigen::Matrix4f transformationMatrix
 //o/p : outputcloud(pcl::pointCloud2)
-CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType &inputCloud, Eigen::Matrix4f transformationMatrix)
+CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen::Matrix4f transformationMatrix)
 {
     CloudWithoutType transformedCloud(new pcl::PCLPointCloud2);
     std::vector<pcl::PCLPointField> fields = inputCloud->fields;
@@ -340,7 +340,7 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType &inputCloud, Eige
   // Computes the orientedBoundingBox from a cloud
   // i/p: pointcloud
   // o/p minimum point3d, maximumpoint3d,  length (diagonal) of BoundingBox
-  float tool::ComputeOrientedBoundingBoxOfCloud(CloudWithNormalPtr &cloud, Eigen::Vector3f &min_pt, Eigen::Vector3f &max_pt)
+  float tool::ComputeOrientedBoundingBoxOfCloud(CloudWithNormalPtr cloud, Eigen::Vector3f &min_pt, Eigen::Vector3f &max_pt)
   {
       // compute principal direction
       Eigen::Vector4f centroid;
@@ -355,8 +355,9 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType &inputCloud, Eige
       Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
       p2w.block<3, 3>(0, 0) = eigDx.transpose();
       p2w.block<3, 1>(0, 3) = -1.f * (p2w.block<3, 3>(0, 0) * centroid.head<3>());
-      CloudWithNormalPtr cPoints;
-      cPoints = cloud;
+      CloudWithNormalPtr cPoints(new pcl::PointCloud <PointNormalType>);;
+      pcl::copyPointCloud(*cloud, *cPoints);
+     // cPoints = cloud;
       pcl::transformPointCloudWithNormals(*cloud, *cPoints, p2w);
 
       Eigen::Vector4f minpt, maxpt;

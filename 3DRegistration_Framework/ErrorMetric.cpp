@@ -568,42 +568,42 @@ namespace
      return features;
  }
 
- double metric::ComputeFeatureAngleForAPoint(Eigen::VectorXf QueryPoint, CloudWithNormalPtr &InputCloud, pcl::KdTreeFLANN<PointNormalType> *ktree, int NumNNQuery)
- {
-     /*CloudWithNormalPtr TempCloud(new pcl::PointCloud<PointNormalType>);
-     pcl::fromPCLPointCloud2(*InputCloud, *TempCloud);*/
-   /*  pcl::KdTreeFLANN<PointNormalType> *tree = nullptr;
-     tree = new(pcl::KdTreeFLANN<PointNormalType>);
-     tree->setInputCloud(TempCloud);*/
-     std::vector<int> pointIdx;
-     std::vector<float> pointSquaredDistance;
-     double features;
-     size_t Size = InputCloud->points.size();
-
-     PointNormalType qPoint;
-     qPoint.getVector3fMap() = QueryPoint.head<3>();
-     qPoint.getNormalVector3fMap() = QueryPoint.tail<3>();
-     double norm_angle = 0.0;
-     ktree->nearestKSearch(qPoint, NumNNQuery, pointIdx, pointSquaredDistance);
-     if (pointIdx.size() > 1)
-     {
-#pragma omp parallel for
-         for (int idx = 1; idx < pointIdx.size(); idx++)
-         {
-             Eigen::Vector3f po = qPoint.getNormalVector3fMap();
-             Eigen::Vector3f pn = InputCloud->points[pointIdx[idx]].getNormalVector3fMap();
-             double angle = acos(po.dot(pn));
-             norm_angle += angle;   // angle in radian
-         }
-         features = norm_angle / Size;
-     }
-     else
-     {
-         features = 0.0;
-     }
-
-     return features;
- }
+// double metric::ComputeFeatureAngleForAPoint(Eigen::VectorXf QueryPoint, CloudWithNormalPtr &InputCloud, pcl::KdTreeFLANN<PointNormalType> *ktree, int NumNNQuery)
+// {
+//     /*CloudWithNormalPtr TempCloud(new pcl::PointCloud<PointNormalType>);
+//     pcl::fromPCLPointCloud2(*InputCloud, *TempCloud);*/
+//   /*  pcl::KdTreeFLANN<PointNormalType> *tree = nullptr;
+//     tree = new(pcl::KdTreeFLANN<PointNormalType>);
+//     tree->setInputCloud(TempCloud);*/
+//     std::vector<int> pointIdx;
+//     std::vector<float> pointSquaredDistance;
+//     double features;
+//     size_t Size = InputCloud->points.size();
+//
+//     PointNormalType qPoint;
+//     qPoint.getVector3fMap() = QueryPoint.head<3>();
+//     qPoint.getNormalVector3fMap() = QueryPoint.tail<3>();
+//     double norm_angle = 0.0;
+//     ktree->nearestKSearch(qPoint, NumNNQuery, pointIdx, pointSquaredDistance);
+//     if (pointIdx.size() > 1)
+//     {
+//#pragma omp parallel for
+//         for (int idx = 1; idx < pointIdx.size(); idx++)
+//         {
+//             Eigen::Vector3f po = qPoint.getNormalVector3fMap();
+//             Eigen::Vector3f pn = InputCloud->points[pointIdx[idx]].getNormalVector3fMap();
+//             double angle = acos(po.dot(pn));
+//             norm_angle += angle;   // angle in radian
+//         }
+//         features = norm_angle / Size;
+//     }
+//     else
+//     {
+//         features = 0.0;
+//     }
+//
+//     return features;
+// }
  bool metric::FilterPointsOnCurvatureValues(double features_source, double features_target, float eig_value_source, float eig_value_target)
  {
      bool fitering_criteria = false;

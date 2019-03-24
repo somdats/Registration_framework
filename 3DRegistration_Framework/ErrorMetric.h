@@ -21,6 +21,6 @@ namespace metric
     REG3D_API void WriteTimingsOfMethodInASingleFile( std:: string &Path, std::string &FolderList, std::string &OutputTimingFile, std::string &AlgorithmName, bool variable = false);
     REG3D_API std::vector<double>ComputeFeatureAngleForACloud(CloudWithoutType &InputCloud, int NumNNQuery =  10);
     REG3D_API bool FilterPointsOnCurvatureValues(double features_source, double features_target, float eig_value_source, float eig_value_target);
-    REG3D_API double ComputeFeatureAngleForAPoint( Eigen::VectorXf QueryPoint, CloudWithNormalPtr &InputCloud, pcl::KdTreeFLANN<PointNormalType>*ktree, int NumNNQuery = 10);
+  //  REG3D_API double ComputeFeatureAngleForAPoint( Eigen::VectorXf QueryPoint, CloudWithNormalPtr &InputCloud, pcl::KdTreeFLANN<PointNormalType>*ktree, int NumNNQuery = 10);
    
 }

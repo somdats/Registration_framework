@@ -489,8 +489,8 @@ Eigen::Vector3f cMLSearch :: ComputeWeightedCovariancematrix(CloudPtr &targetClo
     Eigen_Vectors[2] = eigen_vector3;
     
     //verification if eigen vectors are correct
-    if (std::abs(eigen_vector1.dot(eigen_vector2)) < 1e-7f && std::abs(eigen_vector1.dot(eigen_vector3)) <1e-7f
-        && std::abs(eigen_vector2.dot(eigen_vector3)) <1e-7f)
+ /*   if (std::abs(eigen_vector1.dot(eigen_vector2)) < 1e-7f && std::abs(eigen_vector1.dot(eigen_vector3)) <1e-7f
+        && std::abs(eigen_vector2.dot(eigen_vector3)) <1e-7f)*/
         // std::cout << "dot product is zero:" << "1" << std::endl;
         ///*else  if (std::abs(eigen_vector1.dot(eigen_vector3)) <1e-7)
         //    std::cout << "dot product is zero:" << "2" << std::endl;
@@ -500,7 +500,7 @@ Eigen::Vector3f cMLSearch :: ComputeWeightedCovariancematrix(CloudPtr &targetClo
         //{
         //  //  std::cout << "dot product is  not zero:" <<  std::endl;
         //}
-        cov_matrix = vAverageCov.getCovariance();
+    cov_matrix = vAverageCov.getCovariance();
     eigen_values /= eigen_values.sum();
     return eigen_values;
 }
