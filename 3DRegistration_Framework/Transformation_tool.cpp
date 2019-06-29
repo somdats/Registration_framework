@@ -8,6 +8,117 @@
  // i/p: inputCloud
  // i/p : Eigen::Matrix4f transformationMatrix
 //o/p : outputcloud(pcl::pointCloud2)
+namespace
+{
+    float bilinear(
+        const float &tx,
+        const float  &ty,
+        const float &c00,
+        const float &c10,
+        const float &c01,
+        const float &c11)
+    {
+#if 1 
+        float  a = c00 * (1 - tx) + c10 * tx;
+        float  b = c01 * (1 - tx) + c11 * tx;
+        return a * ((1) - ty) + b * ty;
+#else 
+        return (1 - tx) * (1 - ty) * c00 +
+            tx * (1 - ty) * c10 +
+            (1 - tx) * ty * c01 +
+            tx * ty * c11;
+#endif 
+    }
+    float ComputeNewPixelValue(float A, float B, float C, float D, float x_diff, float y_diff)
+    {
+        float gray;
+        if (A != -INFINITY && B != -INFINITY && C != -INFINITY && D != -INFINITY)
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff) +
+                C*(y_diff)*(1 - x_diff) + D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B == -INFINITY) && (C == -INFINITY) && (D != -INFINITY))
+        {
+            gray =  D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B == -INFINITY) && (C != -INFINITY) && (D == -INFINITY))
+        {
+            gray = C*(y_diff)*(1 - x_diff);
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B == -INFINITY) && (C != -INFINITY) && (D != -INFINITY))
+        {
+            gray = C*(y_diff)*(1 - x_diff) + D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B != -INFINITY) && (C == -INFINITY) && (D == -INFINITY))
+        {
+            gray = B*(x_diff)*(1 - y_diff);
+
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B != -INFINITY) && (C == -INFINITY) && (D != -INFINITY))
+        {
+            gray =  B*(x_diff)*(1 - y_diff) + D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B != -INFINITY) && (C != -INFINITY) && (D == -INFINITY))
+        {
+            gray = B*(x_diff)*(1 - y_diff) +  C*(y_diff);
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B != -INFINITY) && (C != -INFINITY) && (D != -INFINITY))
+        {
+            gray =  B*(x_diff)*(1 - y_diff) + C*(y_diff)*(1 - x_diff) + D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A != -INFINITY) && (B == -INFINITY) && (C == -INFINITY) && (D != -INFINITY))
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff);
+            return gray;
+        }
+        else  if ((A != -INFINITY) && (B == -INFINITY) && (C == -INFINITY) && (D != -INFINITY))
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff) + D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A != -INFINITY) && (B == -INFINITY) && (C != -INFINITY) && (D == -INFINITY))
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff) + C*(y_diff)*(1 - x_diff);
+            return gray;
+        }
+        else  if ((A != -INFINITY) && (B == -INFINITY) && (C != -INFINITY) && (D != -INFINITY))
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff) + C*(y_diff)*(1 - x_diff) + D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A != -INFINITY) && (B != -INFINITY) && (C == -INFINITY) && (D == -INFINITY))
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff);
+            return gray;
+        }
+      
+        else  if ((A != -INFINITY) && (B != -INFINITY) && (C == -INFINITY) && (D != -INFINITY))
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff) + D*(x_diff*y_diff);
+            return gray;
+        }
+        else  if ((A != -INFINITY) && (B != -INFINITY) && (C != -INFINITY) && (D == -INFINITY))
+        {
+            gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff) +
+                C*(y_diff)*(1 - x_diff);
+            return gray;
+        }
+        else  if ((A == -INFINITY) && (B == -INFINITY) && (C == -INFINITY) && (D == -INFINITY))
+        {
+            gray = -INFINITY;
+            return gray;
+        }
+
+    }
+}
 CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen::Matrix4f transformationMatrix)
 {
     CloudWithoutType transformedCloud(new pcl::PCLPointCloud2);
@@ -545,4 +656,174 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
       transform.translation() = translation;
       Eigen::Matrix4f groundTruthTransform = transform.matrix();
       return groundTruthTransform;
+  }
+  Eigen::MatrixXf tool::RowShiftMatrix(const Eigen::MatrixXf & in, int down)
+  {
+      if (!down)
+          return in;
+      Eigen::MatrixXf out(in.rows(), in.cols());
+      if (down > 0) down = down % in.rows();
+      else down = in.rows() - (-down % in.rows());
+      // We avoid the implementation-defined sign of modulus with negative arg. 
+      int rest = in.rows() - down;
+      out.topRows(down) = in.bottomRows(down);
+      out.bottomRows(rest) = in.topRows(rest);
+      return out;
+  }
+
+  Eigen::MatrixXf tool::CreateMatrixFromStlVector( std::vector<float> Data,const int row, const int col)
+  {
+     
+      Eigen::MatrixXf eigMat2 = Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(Data.data(), row,col);
+      //Eigen::MatrixXf eigMat1 = Eigen::MatrixXf::Zero(row, col);// (Data.data())
+      //int row_step = 0;
+      //std::cout <<"before:" << eigMat2 << std::endl;
+      //for (int itr = 0; itr < row; itr++)
+      //{
+      //    std::vector<float>::const_iterator first = Data.begin() + row_step;
+      //    std::vector<float>::const_iterator last = Data.begin() + row + row_step;
+      //   std::vector<float> v2(first, last);
+      //   eigMat1.row(itr) = Eigen::Map<Eigen::VectorXf, Eigen::Unaligned>(v2.data(), v2.size());
+      //    row_step = row_step + row;
+      //   
+      //}
+     
+      //std::cout << eigMat1 << std::endl;
+     // eigMat2.transposeInPlace();
+    /*  std::cout << eigMat2 << std::endl;
+      std::vector<float>temp_data;
+      temp_data.insert(temp_data.end(), std::make_move_iterator(eigMat2.data()), std::make_move_iterator(eigMat2.data() + eigMat2.size()));*/
+      return eigMat2;
+  }
+
+  std::vector<float> tool::CreateStlVectorFromMatirx( Eigen::MatrixXf in)
+  {
+      in.transposeInPlace();
+      std::vector<float>temp_data;
+      temp_data.insert(temp_data.end(), std::make_move_iterator(in.data()), std::make_move_iterator(in.data() + in.size()));
+      return temp_data;
+  }
+  std::vector<float> tool::ReScaleImageBilinear(const std::vector<float> & ImgData, int row_prev, int col_prev, int row_new, int col_new)
+  {
+      int new_size = row_new * col_new;
+      std::vector<float> temp(new_size, -INFINITY);
+      float A, B, C, D, gray;
+      float x_ratio = ((float)(col_prev)) / col_new;
+      float y_ratio = ((float)(row_prev)) / row_new;
+      float x_diff, y_diff, ya, yb;
+      int offset = 0;
+      int  index, x, y;
+      for (int i = 0; i< row_new; i++)
+      {
+          for (int j = 0; j< col_new; j++)
+          {
+            
+             
+              x = (int)(x_ratio * j);
+              y = (int)(y_ratio * i);
+              float accumulate = 0;
+              int count = 0;
+              for (int x_itr = x; x_itr < x + x_ratio; x_itr++)
+              {
+                  for (int y_itr = y; y_itr < y + y_ratio; y_itr++)
+                  {
+                      float val = ImgData[y_itr*col_prev + x_itr];
+                      if (val != -INFINITY)
+                      {
+                          accumulate += val;
+                          count++;
+                      }
+
+                    
+                  }
+
+              }
+              if (count > 0)
+                  temp[offset] = std::round(accumulate / float(count));
+            //  x_diff = (x_ratio * j) - x;
+             // y_diff = (y_ratio * i) - y;
+             // index = y*col_prev + x;
+             // std::cout << y << "," << x << "index=" << index << std::endl;
+
+             ////bilinear interpolation
+             // A = ImgData[index] ;
+             // B = ImgData[index + 1];
+             // C = ImgData[index + col_prev] ;
+             // D = ImgData[index + col_prev + 1] ;
+
+             // // Y = A(1-w)(1-h) + B(w)(1-h) + C(h)(1-w) + Dwh
+             ///* if (A != -INFINITY && B != -INFINITY && C != -INFINITY && D != -INFINITY)
+             // {
+             //     gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff) +
+             //         C*(y_diff)*(1 - x_diff) + D*(x_diff*y_diff);
+
+             //     temp[offset] = gray;
+             // }
+             // else if (A != -INFINITY && B != -INFINITY)
+             // {
+             //     gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff);
+             //     temp[offset] = gray;
+             // }
+             // else if (A != -INFINITY && C != -INFINITY)
+             // {
+             //     gray = A*(1 - x_diff)*(1 - y_diff) + C*(y_diff)*(1 - x_diff);
+             //     temp[offset] = gray;
+             // }
+             // else if (A != -INFINITY && D != -INFINITY)
+             // {
+             //     gray = A*(1 - x_diff)*(1 - y_diff) + D*(x_diff*y_diff);
+             //     temp[offset] = gray;
+             // }
+             // else if (B != -INFINITY && C != -INFINITY)
+             // {
+             //     gray = B*(x_diff)*(1 - y_diff) + C*(y_diff)*(1 - x_diff);
+             //     temp[offset] = gray;
+             // }
+             // else if (B != -INFINITY && D != -INFINITY)
+             // {
+             //     gray = B*(x_diff)*(1 - y_diff) + D*(x_diff*y_diff);
+             //     temp[offset] = gray;
+             // }
+             // else
+             //     continue;*/
+             // temp[offset] = ComputeNewPixelValue(A, B, C, D, x_diff, y_diff);
+              offset++;
+          }
+      }
+      return temp;
+  }
+  std::vector<float>tool::testBilinearInterpolation(std::vector<float>ImgData, int row_prev, int col_prev, int row_new, int col_new)
+  {
+      // testing bilinear interpolation
+      int new_size = row_new * col_new;
+      std::vector<float> temp(new_size, -INFINITY);
+
+      // now compute our final image using bilinear interpolation
+      int offset = 0;
+      for (int j = 0; j < row_new; ++j)
+      {
+          for (int i = 0; i < col_new; ++i)
+          {
+              // convert i,j to grid coordinates
+              float gx = i / float(col_new) * col_prev;
+              float gy = j / float(row_new) * row_prev;
+              int gxi = int(gx);
+              int gyi = int(gy);
+              const float c00 = ImgData[gyi * (col_new ) + gxi];
+              const float c10 = ImgData[gyi * (col_new) + (gxi + 1)];
+              const float c01 = ImgData[(gyi + 1) * (col_new) + gxi];
+              const float c11 = ImgData[(gyi + 1) * (col_new ) + (gxi + 1)];
+              std::cout << gyi * (col_new) + gxi << std::endl;
+              std::cout << gyi * (col_new) + (gxi + 1) << std::endl;
+              std::cout << (gyi + 1) * (col_new) + gxi << std::endl;
+              std::cout << (gyi + 1) * (col_new) + (gxi + 1) << std::endl;
+              if (c00 != -INFINITY && c10 != -INFINITY && c01 != -INFINITY && c11 != -INFINITY)
+              {
+                  temp[offset] = bilinear(gx - gxi, gy - gyi, c00, c10, c01, c11);
+              }
+              offset++;
+          }
+      }
+      return  temp;
+
   }
