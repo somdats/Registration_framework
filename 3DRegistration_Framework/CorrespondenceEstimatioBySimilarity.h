@@ -13,7 +13,8 @@ class REG3D_API CirconCorrespondence : public CorrespondenceEstimator::ICorrespo
 {
 public:
     CirconCorrespondence(CloudWithoutType sourceCloud, CloudWithoutType targetCloud, int div_row, int div_col, int height_division,
-        int nr_resolution = 4, int col_search = 32, const ON_NurbsSurface &surface_fit = ON_NurbsSurface(), const ON_NurbsCurve &curve_fit = ON_NurbsCurve(),
+        std::vector<Eigen::Vector2d> src_st, std::vector<Eigen::Vector2d> tgt_st, int nr_resolution = 4, int col_search = 32, 
+        const ON_NurbsSurface &surface_fit = ON_NurbsSurface(), const ON_NurbsCurve &curve_fit = ON_NurbsCurve(),
         const ON_NurbsSurface &surface_fit_tgt = ON_NurbsSurface(), const ON_NurbsCurve &curve_fit_tgt = ON_NurbsCurve(),
         bool write_data = false, float rho = 1.0f, float lambda = 1.0f, bool poi = false) :
         input_source(sourceCloud),
@@ -22,8 +23,8 @@ public:
         lambda_(lambda),
         division_col(div_col),
         division_row(div_row),
-        cid_source(sourceCloud, div_row, div_col, height_division, surface_fit, curve_fit),
-        cid_target(targetCloud, div_row, div_col, height_division, surface_fit_tgt, curve_fit_tgt),
+        cid_source(sourceCloud, div_row, div_col, height_division,src_st, surface_fit, curve_fit, col_search),
+        cid_target(targetCloud, div_row, div_col, height_division,tgt_st, surface_fit_tgt, curve_fit_tgt, col_search),
         basic_descriptor(poi),
         num_resolution(nr_resolution),
         nr_search_col(col_search),
@@ -56,7 +57,7 @@ public:
     float ComputeMeasureOfSimilarity(const std::vector<float>& src_image, const std::vector<float>& tar_image);
     CirconImageDescriptor TransformCirconDescriptor( int index);
     Measure CompareDescriptorWithSimilarityMeasure(const std::vector<float>& src_image, const std::vector<float>& tar_image);
-    void CompareDescriptor(const std::vector<float>& src_image, const std::vector<float>& tar_image, int with_nurbs);
+    Measure CompareDescriptor(const std::vector<float>& src_image, const std::vector<float>& tar_image, int with_nurbs);
   static std::vector<float> ComputelaplacianOfNormals(CloudWithoutType &inputCloud);
  static  void WriteLaplacianImage(std::string fileName, CloudWithoutType inputCloud, std::vector <UVData<float>>pixelIndex);
  static std::map<float, int> ComputeMeanCurvatureFromPointCloud(CloudWithoutType inputCloud);
@@ -79,8 +80,8 @@ public:
      std::vector<float>&max_shift_descriptor, int &rotation_idx, std::map<int, size_t>&image_point_index_map_current, int& secondary_dsc_posn);
  void EvaluateSimilarityMeasureParameter(int src_idx, int tar_idx, float delta_step,std::string dirname, std::string  OutputFile);
  void SetParameterForSimilarityMeasure(float row, float lambda);
- std::pair<PointNormalType, PointNormalType> ComputeFictituousCorrespondencePair(PointNormalType qSrcPt, pcl::KdTreeFLANN<PointNormalType>ktree_src, 
-     pcl::KdTreeFLANN<PointNormalType>ktree_tar, float avgDist, Eigen::Matrix4f curr_transform, std::pair<int,int>&index_pair);
+ std::pair<PointNormalType, PointNormalType> ComputeFictituousCorrespondencePair(const PointNormalType &qSrcPt, const pcl::KdTreeFLANN<PointNormalType> &ktree_src, 
+   const  pcl::KdTreeFLANN<PointNormalType> &ktree_tar, float avgDist, Eigen::Matrix4f curr_transform, std::pair<int,int>&index_pair);
  std::pair<float, float> EstimateStopParameter(std::pair<PointNormalType, PointNormalType>corres_pair, std::pair<int, int>index_pair, 
      Eigen::Matrix4f Pair_Transform, Eigen::Matrix4f Corres_Transform);
  static void ComputePointOfInterestbasedOnUniformSampling(CloudWithoutType inputCloud,  double radius, std::string OutputFileName);
@@ -90,7 +91,9 @@ std::vector<float>&max_shift_descriptor, std::map<int, size_t>&image_point_index
 int &rotation_idx, int& secondary_dsc_posn);
  CirconImageDescriptor TransformCirconDescriptor(const Eigen::VectorXd &pt);
 
- 
+ static surface::CloudBoundingBox initNurbsPCABoundingBox(int order, pcl::on_nurbs::NurbsDataSurface &data, Eigen::Vector3d &mean, Eigen::Matrix3d &eigenvectors, Eigen::Vector3d &V_max,
+     Eigen::Vector3d &V_min);
+ void SetBoundingBoxForDescriptors(surface::CloudBoundingBox &src_bbs, surface::CloudBoundingBox &tgt_bbs);
    
 
 
@@ -132,4 +135,5 @@ protected:
     std::vector<float> RotateImageByIndexNumber(const Eigen::MatrixXf & vector_matrix, int rot_idx);
     float EvaluateSimilarityByRotationShift(const std::vector<std::vector<float>>& src_descriptors, const std::vector<std::vector<float>>& target_descriptors,
         int& rotation_idx, std::vector<float>& max_descriptor, int min_res = 8);
+    
 };

@@ -461,7 +461,7 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
       Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> eigen_solver(covariance, Eigen::ComputeEigenvectors);
       Eigen::Matrix3f eigDx = eigen_solver.eigenvectors();
       eigDx.col(2) = eigDx.col(0).cross(eigDx.col(1));
-
+     // std::cout << eigDx << std::endl;
       // move the points to the that reference frame
       Eigen::Matrix4f p2w(Eigen::Matrix4f::Identity());
       p2w.block<3, 3>(0, 0) = eigDx.transpose();

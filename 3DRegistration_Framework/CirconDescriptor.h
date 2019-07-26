@@ -55,6 +55,7 @@ class CirconImage
 {
 protected:
     std::vector<float>cell;
+    std::vector<std::vector<float>>image;
 
     int columns;
     int rows;
@@ -80,8 +81,8 @@ class REG3D_API CirconImageDescriptor: public FeatureEstimators::IFeature
 {
 public:
     CirconImageDescriptor(){}
-    CirconImageDescriptor(CloudWithoutType &inputCloud, int division_row, int division_col, int height_division, const ON_NurbsSurface &surface_fit = ON_NurbsSurface(),
-        const ON_NurbsCurve &curve_fit = ON_NurbsCurve()) :
+    CirconImageDescriptor(CloudWithoutType &inputCloud, int division_row, int division_col, int height_division, std::vector<Eigen::Vector2d> st_param = {Eigen::Vector2d(-1.0,-1.0)}, const ON_NurbsSurface &surface_fit = ON_NurbsSurface(),
+        const ON_NurbsCurve &curve_fit = ON_NurbsCurve(), int max_search = 16) :
         inputCloud(inputCloud),
         num_division_row(division_row), 
         num_division_col(division_col),
@@ -91,6 +92,8 @@ public:
         basic_cell_index(-1),
         nb_surface(surface_fit),
         nb_curve(curve_fit),
+        no_col_search(max_search),
+        st_params(st_param),
         original_cloud_with_normal(new pcl::PointCloud <PointNormalType>)
     {
         pcl::fromPCLPointCloud2(*inputCloud, *original_cloud_with_normal);
@@ -144,10 +147,15 @@ public:
     void CreateSecondaryDescriptor(const Eigen::VectorXd &pt);
     std::unique_ptr<ON_NurbsSurface> GetNurbsSurface();
     std::unique_ptr<ON_NurbsCurve> GetNurbsCurve();
-    void SetNurbsSurfaceAndCurve(const ON_NurbsSurface &nbs, const ON_NurbsCurve &ncs);
+    void SetNurbsSurfaceAndCurve(const ON_NurbsSurface &nbs);
    // nb_surface(inputCloud);
     static Eigen::Matrix4f ConstructLocalCoordinateAxes(CirconImageDescriptor &cid, PointNormalType &axis_point);
     void SetLocalFrame(const Eigen::Matrix4f &l_frame);
+    void UpdateDeescriptor(const Eigen::VectorXd &pt);
+    void SetMaxSearchColumn(int max_value);
+    void SetBoundingBoxInformation(const surface::CloudBoundingBox &box);
+    Eigen::Vector2d TransformAndScaleParametricCoordinate(const Eigen::Vector2d & vec2d, const double &w, const double &h);
+    void SetParametersforDescriptor(std::vector<Eigen::Vector2d> st_parameter);
   
 protected:
     CloudWithoutType inputCloud;
@@ -179,5 +187,9 @@ protected:
     std::vector<_dV>descriptor_content;
     ON_NurbsSurface nb_surface;
     ON_NurbsCurve   nb_curve;
+    int no_col_search;
+    surface::CloudBoundingBox bbs;
+    std::vector<std::map<float, int>>vector_of_maps;
+    std::vector<Eigen::Vector2d>st_params;
 };
 

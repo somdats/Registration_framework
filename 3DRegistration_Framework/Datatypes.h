@@ -220,3 +220,7 @@ template< typename type1>
         }
         return flag;
   }
+   static auto comparator = [](const float &x1, const float &x2)
+    {
+        return x2 > x1;
+    };
