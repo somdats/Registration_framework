@@ -5,6 +5,7 @@
 #include"NurbsSurface.h"
 #include<map>
 #include <chrono>
+#include"UniformGrid.h"
 
 struct descriptor_Value
 {
@@ -69,18 +70,19 @@ public:
     void addCellAt(int row, int col,int col_div, float entry);
     float getCell(int row, int column, int col_div);
     void clearMatrix();
-    std::vector<float> getImageData();
+    std::vector<std::vector<float>> getImageData();
     void SetImageData(std::vector<float>new_img_data);
-    void WriteImage(std::string &pszFileName, std::vector<float>ImageData);
+    void WriteImage(std::string &pszFileName, std::vector<std::vector<float>>ImageData);
     void SetImage(int col, int row);
     unsigned int WriteBitMap(std::string &pszFileName, unsigned char *pImgData);  // TODO change the location to neutral accessible source file
 };
 
 
-class REG3D_API CirconImageDescriptor: public FeatureEstimators::IFeature
+class REG3D_API CirconImageDescriptor/*: public FeatureEstimators::IFeature*/
 {
 public:
     CirconImageDescriptor(){}
+   // ~CirconImageDescriptor();
     CirconImageDescriptor(CloudWithoutType &inputCloud, int division_row, int division_col, int height_division, std::vector<Eigen::Vector2d> st_param = {Eigen::Vector2d(-1.0,-1.0)}, const ON_NurbsSurface &surface_fit = ON_NurbsSurface(),
         const ON_NurbsCurve &curve_fit = ON_NurbsCurve(), int max_search = 16) :
         inputCloud(inputCloud),
@@ -94,6 +96,8 @@ public:
         nb_curve(curve_fit),
         no_col_search(max_search),
         st_params(st_param),
+        kdTree(new pcl::KdTreeFLANN<PointType>),
+        Cloud2D(new pcl::PointCloud<PointType>),
         original_cloud_with_normal(new pcl::PointCloud <PointNormalType>)
     {
         pcl::fromPCLPointCloud2(*inputCloud, *original_cloud_with_normal);
@@ -101,7 +105,7 @@ public:
    
     CirconImageDescriptor & operator=(const CirconImageDescriptor &cid); // asignment
     CirconImageDescriptor( const CirconImageDescriptor &cid);  // copy constructor
-    void ComputeFeature();
+    void ComputeFeature(const CUniformGrid2D &cGrid2D);
     void ComputeFeature(int i);
     void SetAngularResolution(float angle_resolution, int num_division);
     void SetRadialResolution(float distance, int num_division);
@@ -110,13 +114,13 @@ public:
     PointNormalType ComputeBasicPointOfInterest();
     void ConstructLocalFrameOfReference();
     float ComputeMaximumRadius(const CloudWithoutType& input_Cloud);
-    float ComputeheightFromPointCloud(const CloudWithoutType& input_Cloud);
+    float ComputeheightFromPointCloud(const CloudWithNormalPtr& input_Cloud);
     void SetImageDescriptorResolution(float full_angle, float max_radius, float height_max);
     void WriteDescriptorAsImage(std::string FileName);
     void ReconstructPointCloud();
     void WritePointCloud(std::string fileName);
     void SetInputAsTransformedCloud(CloudWithoutType InputCloud);
-    std::vector<float> GetDescriptorImage();
+    std::vector<std::vector<float>> GetDescriptorImage();
     std::vector<float>TransformImageData(std::vector<float>prev_data, int query_index);
     void UpdateLocalFrameafterTransformation(PointNormalType new_origin, std::vector<Eigen::Vector3f> new_local_frame);
     PointNormalType GetRotationAXisPoint();
@@ -143,7 +147,7 @@ public:
     void SetRotationIndex(int index);
     float GetRadiusFromCloud();  // useful for computing radial resolution
     void SetMaximumRadius(float rad);
-    std::vector<_dV> GetDescriptorContent();
+    std::vector<std::vector<_dV>> GetDescriptorContent();
     void CreateSecondaryDescriptor(const Eigen::VectorXd &pt);
     std::unique_ptr<ON_NurbsSurface> GetNurbsSurface();
     std::unique_ptr<ON_NurbsCurve> GetNurbsCurve();
@@ -156,6 +160,15 @@ public:
     void SetBoundingBoxInformation(const surface::CloudBoundingBox &box);
     Eigen::Vector2d TransformAndScaleParametricCoordinate(const Eigen::Vector2d & vec2d, const double &w, const double &h);
     void SetParametersforDescriptor(std::vector<Eigen::Vector2d> st_parameter);
+    void Set2DCloud(const CloudPtr &cloud);
+    typedef pcl::KdTreeFLANN<PointType>KdTreeType;
+    void SetMaximumAverageDistance(const float &dist);
+    void Set2DUniformGrid(CloudWithNormalPtr &in_cloud);
+    void SetFlagForHighResolution(const bool &flag);
+    void ResetFlagForHighResolution();
+    void SetUpResolutionCount(int res);
+    float GetAverageDist();
+    
   
 protected:
     CloudWithoutType inputCloud;
@@ -177,6 +190,8 @@ protected:
     Eigen::Matrix3f World_to_local;  // basic point of interest rotation frame information
     int basic_point_index;
     CloudWithNormalPtr original_cloud_with_normal;
+    CloudPtr Cloud2D;
+   
   
     Eigen::Matrix3f rot_matrix;  // if the current descriptor is rotated around different point: stores the rotation matrix
     int rotation_index;  // indicates no. of row shift from the original descriptor after the transformtion
@@ -184,12 +199,19 @@ protected:
     float sigma_threshold;
     int basic_cell_index;
     float max_radius;
-    std::vector<_dV>descriptor_content;
+    std::vector<std::vector<_dV>>descriptor_content;
     ON_NurbsSurface nb_surface;
     ON_NurbsCurve   nb_curve;
     int no_col_search;
     surface::CloudBoundingBox bbs;
     std::vector<std::map<float, int>>vector_of_maps;
+    
     std::vector<Eigen::Vector2d>st_params;
+    KdTreeType kdTree;
+   // CUniformGrid2D cGrid2D;
+    float avgpoint_dist;
+    bool high_res_flag = false;
+    int up_resolution_count = 16;
+ 
 };
 

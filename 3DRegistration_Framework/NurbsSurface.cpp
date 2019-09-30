@@ -130,7 +130,8 @@ std::unique_ptr<ON_NurbsCurve>cNurbsCurve::TransformControlPointsOfNurbsCurve(co
     return std::make_unique<ON_NurbsCurve>(curve_new);
 }
 
-bool surface::TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsSurface & ns, const ON_NurbsCurve& nc)
+bool surface::TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsSurface & ns, const ON_NurbsCurve& nc, 
+    const Eigen::Vector3d &a0, const Eigen::Vector3d &a1, const double &rScale)
 {
     bool is_inside = false;
     // copy knots
@@ -148,13 +149,13 @@ bool surface::TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsS
     double y1 = ns.Knot(1, ns.KnotCount(1) - 1);
     double h = y1 - y0;
 
-    Eigen::Vector3d a0, a1;
+   // Eigen::Vector3d a0, a1;
     double err, param;
     Eigen::Vector2d pc, tc;
     std::vector<double> params(1, 0.0);
-   pcl::on_nurbs::NurbsTools::computeBoundingBox(nc, a0, a1);
+ /*  pcl::on_nurbs::NurbsTools::computeBoundingBox(nc, a0, a1);
     double rScale = 1.0 / pcl::on_nurbs::NurbsTools::computeRScale(a0, a1);
-
+*/
     if (nc.Order() == 2)
         param = pcl::on_nurbs::FittingCurve2dAPDM::inverseMappingO2(nc, vec_2d, err, pc, tc);
     else
@@ -168,6 +169,12 @@ bool surface::TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsS
     Eigen::Vector3d z = a.cross(b);
     is_inside = (z(2) >= 0.0);
     return is_inside;
+}
+
+void surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(const ON_NurbsCurve& nc, Eigen::Vector3d &a0, Eigen::Vector3d &a1, double &rScale)
+{
+    pcl::on_nurbs::NurbsTools::computeBoundingBox(nc, a0, a1);
+    rScale = 1.0 / pcl::on_nurbs::NurbsTools::computeRScale(a0, a1);
 }
 std::unique_ptr<ON_NurbsSurface> cNurbsSurface::TransformControlPointsOfNurbsSurface(const ON_NurbsSurface &nurb, const Eigen::Matrix4d &transform)
 {
@@ -367,9 +374,9 @@ double cNurbsSurface::ComputeOptimizedParameterSpaceValue(Ray_Intersect &r_it, d
     Eigen::Vector2d &optim_parameter, bool use_center)
 {
     // set up optimizer
-    nlopt::opt optim(LN_PRAXIS, 2);
+ /*   nlopt::opt optim(LN_PRAXIS, 2);
     optim.set_stopval(stop_threshold);
-    optim.set_min_objective(RayIntersect, &r_it);
+    optim.set_min_objective(RayIntersect, &r_it);*/
 
     double error1 = INF, error2 = INF, error3 = INF, error4 = INF;
     double min_error = INF;
@@ -442,7 +449,18 @@ double cNurbsSurface::ComputeOptimizedParameterSpaceValue(Ray_Intersect &r_it, d
                 quadrant.y() = !quadrant.y();
         }
     }
-    return info[1];
+    if (optim_parameter[0] >= r_it.x0 && optim_parameter[0] <= r_it.x1 && optim_parameter[1] >= r_it.y0 && optim_parameter[1] <= r_it.y1
+        && info[1] < 1e-4)
+    {
+
+        return  info[1];
+     
+    }
+    else
+    {
+        return  error1;
+    }
+  
 }
  void cNurbsSurface::Optimize(nlopt::opt &optim, std::vector<double> &optimized_param, double &error)
  {
@@ -554,11 +572,14 @@ bool cNurbsSurface::EvaluateParameterForCoordinate(std::vector<Eigen::Vector2d> 
     double z_coordinate_max = -INF;
     bool inside = false;
     pt = Eigen::VectorXd::Zero(6);
+    Eigen::Vector3d a0, a1;
+    double scale;
+    surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(nc, a0, a1, scale);
     if (optim_parameter.size() <= 0)
         return inside;
     for (Eigen::Vector2d vec2d : optim_parameter)
     {
-        inside = TrimInputSurfaceUsingCurveBoundary(vec2d, ns, nc);
+        inside = TrimInputSurfaceUsingCurveBoundary(vec2d, ns, nc,a0,a1,scale);
        if (inside)
        {
            Eigen::Vector3d vec3[3];
@@ -586,9 +607,12 @@ bool cNurbsSurface::EvaluateParameterForCoordinate3D(std::vector<Eigen::Vector2d
     pt = Eigen::VectorXd::Zero(6);
     if (optim_parameter.size() <= 0)
         return inside;
+    Eigen::Vector3d a0, a1;
+    double scale;
+    surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(nc, a0, a1, scale);
     /*for (Eigen::Vector2d vec2d : optim_parameter)
     {*/
-        inside = TrimInputSurfaceUsingCurveBoundary(optim_parameter[0], ns, nc);
+        inside = TrimInputSurfaceUsingCurveBoundary(optim_parameter[0], ns, nc,a0,a1,scale);
         if (inside)
         {
             Eigen::Vector3d vec3[3];

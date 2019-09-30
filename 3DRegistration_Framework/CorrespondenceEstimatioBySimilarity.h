@@ -39,13 +39,14 @@ public:
         float similarity_value;
         int cell_index; // cell_index corresponding to basic descriptor for which similarity value is maximum
         int rotation_index;
-        std::vector<float>cell_values; // cell_values correspodning to descriptor with max. similarity value
+        std::vector<std::vector<float>>cell_values; // cell_values correspodning to descriptor with max. similarity value
         PointNormalType point_of_interest;
         size_t point_index;
         Eigen::Matrix4f WlTransform;
         std::map<int, size_t>img_pt_index_map;
         int primary_idx;
         float pix_value;
+        std::vector<std::vector<_dV>> descriptor_content;
     };
     typedef PointData<float> PointDataType;
     void PrepareDataForCorrespondenceEstimation(CloudWithoutType &srcCloud, CloudWithoutType &tarCloud);
@@ -54,17 +55,16 @@ public:
     void PrepareDescriptor(CirconImageDescriptor& cid, PointNormalType rotpoint);
     void PrepareTargetDescriptor(PointNormalType rotpoint);
     //TODO functions to select point of interest in source and target cloud
-    float ComputeMeasureOfSimilarity(const std::vector<float>& src_image, const std::vector<float>& tar_image);
+    float ComputeMeasureOfSimilarity(std::vector<std::vector<float>> &src_image, std::vector<std::vector<float>> &tar_image);
     CirconImageDescriptor TransformCirconDescriptor( int index);
-    Measure CompareDescriptorWithSimilarityMeasure(const std::vector<float>& src_image, const std::vector<float>& tar_image);
-    Measure CompareDescriptor(const std::vector<float>& src_image, const std::vector<float>& tar_image, int with_nurbs);
+    Measure CompareDescriptorWithSimilarityMeasure(const std::vector<std::vector<float>> &src_image, const std::vector<std::vector<float>> &tar_image);
+    Measure CompareDescriptor(const std::vector<std::vector<float>> &src_image, std::vector<std::vector<float>>&tar_image, int with_nurbs);
   static std::vector<float> ComputelaplacianOfNormals(CloudWithoutType &inputCloud);
  static  void WriteLaplacianImage(std::string fileName, CloudWithoutType inputCloud, std::vector <UVData<float>>pixelIndex);
  static std::map<float, int> ComputeMeanCurvatureFromPointCloud(CloudWithoutType inputCloud);
  static CloudWithNormalPtr WriteFilteredPoints(std::string FileName, CloudWithoutType inputCloud,  std::map<float, int>curvature_ratio, float threshold);
  void SetResolutionOfDescriptor( CirconImageDescriptor &dsc, int num_rows, int num_cols, int hei_div = 128);
- std::vector<std::pair<int, float>> ComputeFictitiousCorrespondence(std::map<int, size_t>img_point_map, CloudWithNormalPtr cloud,
-     int corres_1_source_idx, PointNormalType corres_point);
+ PointNormalType ComputeFictitiousCorrespondence(const std::vector<std::vector<_dV>> &descriptor_source,int rot_idx);
 
  std::vector<std::pair<float, std::pair<int, int>>> ComputeCorrespondencePair(std::vector<std::pair<int, float>>src_poi,
      std::vector<std::pair<int, float>>tar_poi);
@@ -74,26 +74,27 @@ public:
      PointNormalType src_corres, PointNormalType tar_corres, Eigen::Matrix4f Pair_Transform, Eigen::Matrix4f Corres_Transform);
  //void CreateIndicesVsPointMap(CloudWithoutType & Source, CloudWithoutType & Target);
  int ReadCorrespondenceIndex(std::string FileNameA, std::string fileNameB);
- Eigen::Matrix4f ComputeAlignmentMatrixinLocalFrame(Eigen::Matrix4f T1, Eigen::Vector3f Trans);
- void ComputeSimilarityBetweenTwoCloud(std::string dirname, std::string  OutputFile);
- float ComputeRotationIndexFromShift(std::vector<float>secondary_descriptor, std::vector<float>target_point_descriptor, 
-     std::vector<float>&max_shift_descriptor, int &rotation_idx, std::map<int, size_t>&image_point_index_map_current, int& secondary_dsc_posn);
+ //::Matrix4f ComputeAlignmentMatrixinLocalFrame(Eigen::Matrix4f T1, Eigen::Vector3f Trans);
+// void ComputeSimilarityBetweenTwoCloud(std::string dirname, std::string  OutputFile);
+ /*float ComputeRotationIndexFromShift(std::vector<float>secondary_descriptor, std::vector<float>target_point_descriptor, 
+     std::vector<float>&max_shift_descriptor, int &rotation_idx, std::map<int, size_t>&image_point_index_map_current, int& secondary_dsc_posn);*/
  void EvaluateSimilarityMeasureParameter(int src_idx, int tar_idx, float delta_step,std::string dirname, std::string  OutputFile);
  void SetParameterForSimilarityMeasure(float row, float lambda);
- std::pair<PointNormalType, PointNormalType> ComputeFictituousCorrespondencePair(const PointNormalType &qSrcPt, const pcl::KdTreeFLANN<PointNormalType> &ktree_src, 
+ std::pair<PointNormalType, PointNormalType> ComputeFictituousCorrespondencePair(const PointNormalType &qSrcPt, const PointNormalType &qtgtPt, const pcl::KdTreeFLANN<PointNormalType> &ktree_src,
    const  pcl::KdTreeFLANN<PointNormalType> &ktree_tar, float avgDist, Eigen::Matrix4f curr_transform, std::pair<int,int>&index_pair);
  std::pair<float, float> EstimateStopParameter(std::pair<PointNormalType, PointNormalType>corres_pair, std::pair<int, int>index_pair, 
      Eigen::Matrix4f Pair_Transform, Eigen::Matrix4f Corres_Transform);
  static void ComputePointOfInterestbasedOnUniformSampling(CloudWithoutType inputCloud,  double radius, std::string OutputFileName);
  static double ComputeRadiusForSampling(CloudWithoutType CloudA, CloudWithoutType CloudB, double sf);
- float ComputeMaximumRotationShiftParameter(const std::vector<float>& secondary_descriptor, const std::vector<float>& target_point_descriptor,
-std::vector<float>&max_shift_descriptor, std::map<int, size_t>&image_point_index_map_current, std::vector<_dV> &descriptor_content,
-int &rotation_idx, int& secondary_dsc_posn);
+ float ComputeMaximumRotationShiftParameter(const std::vector<std::vector<float>>&secondary_descriptor, const std::vector<std::vector<float>> &target_point_descriptor,
+     std::vector<std::vector<float>> &max_shift_descriptor, std::map<int, size_t> &image_point_index_map_current, std::vector<std::vector<_dV>> &descriptor_content,
+int &rotation_idx, int &secondary_dsc_posn);
  CirconImageDescriptor TransformCirconDescriptor(const Eigen::VectorXd &pt);
 
  static surface::CloudBoundingBox initNurbsPCABoundingBox(int order, pcl::on_nurbs::NurbsDataSurface &data, Eigen::Vector3d &mean, Eigen::Matrix3d &eigenvectors, Eigen::Vector3d &V_max,
      Eigen::Vector3d &V_min);
- void SetBoundingBoxForDescriptors(surface::CloudBoundingBox &src_bbs, surface::CloudBoundingBox &tgt_bbs);
+ void SetBoundingBoxForDescriptors(surface::CloudBoundingBox &src_bbs, surface::CloudBoundingBox &tgt_bbs); 
+ CloudPtr Construct2DCloudForKdtreeSearch(const CloudWithNormalPtr &inputCloud, const Eigen::Matrix4f &WorldLocalTransformation);
    
 
 
@@ -109,8 +110,8 @@ protected:
     CirconImageDescriptor cid_source;
     CirconImageDescriptor cid_target;
     cGridSearch *newsearch = nullptr;
-    std::vector<float>source_descriptor_image;
-    std::vector<float>target_descriptor_image;
+    std::vector<std::vector<float>>source_descriptor_image;
+    std::vector<std::vector<float>>target_descriptor_image;
     bool basic_descriptor;
     int division_col;
     int division_row;
@@ -129,11 +130,16 @@ protected:
     std::vector<int>non_valid_index;
     CloudWithNormalPtr original_src_cloud_with_normal;
     float maximum_radius;
+    CloudPtr cloud_with_2d_points;
+    bool high_flag = false;
    /* std::map<PointDataType, int>source_correspondence_map;
     std::map<PointDataType, int>target_correspondence_map;*/
-    std::vector<std::vector<float>> ResScaleTargetDescriptor(const std::vector<float>& Descriptor_Current);
+   // std::vector<std::vector<float>> ResScaleTargetDescriptor(const std::vector<std::vector<float>> &Descriptor_Current);
     std::vector<float> RotateImageByIndexNumber(const Eigen::MatrixXf & vector_matrix, int rot_idx);
-    float EvaluateSimilarityByRotationShift(const std::vector<std::vector<float>>& src_descriptors, const std::vector<std::vector<float>>& target_descriptors,
-        int& rotation_idx, std::vector<float>& max_descriptor, int min_res = 8);
+    float EvaluateSimilarityByRotationShift(const std::vector<std::vector<float>>& src_descriptors,
+        const std::vector<std::vector<float>>& target_descriptors, int& rotation_idx, std::vector<std::vector<float>> &max_descriptor, int min_res = 8);
+    float ReScaleAndEvaluateDescriptorForMaximumRotation(const std::vector<std::vector<float>>& src_descriptors,
+        const std::vector<std::vector<float>>& target_descriptors, int& rotation_idx, std::vector<std::vector<float>> &max_descriptor, int min_res = 8);
+    int up_resolution_count;
     
 };

@@ -48,6 +48,10 @@ namespace surface
         }
 
     };
+    bool TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsSurface& ns, const ON_NurbsCurve &nc, 
+        const Eigen::Vector3d &a0, const Eigen::Vector3d &a1, const double &rScale);
+    void ComputeBoundingBoxAndScaleUsingNurbsCurve(const ON_NurbsCurve &nc, Eigen::Vector3d &a0, Eigen::Vector3d &a1, double &rScale);
+
     class REG3D_API cNurbsSurface
     {
     public:
@@ -88,7 +92,7 @@ namespace surface
             const ON_NurbsCurve& nc, Eigen::VectorXd &pt, Eigen::Vector2d &pt_param, int i = 1);
         static Eigen::VectorXd ComputeClosetPointOnNurbSurface(const Eigen::VectorXd &pt_interest, const ON_NurbsSurface &ns,
             const ON_NurbsCurve &nc, double stop_threshold);
-        friend bool TrimInputSurfaceUsingCurveBoundary( vec2d & vec_2d, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc);
+       // friend bool TrimInputSurfaceUsingCurveBoundary( vec2d & vec_2d, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc);
         data GetNurbSurfaceData();
        
 
@@ -128,7 +132,7 @@ namespace surface
            int fit_iteration, int curve_order);
        void FitCurveToData();
        static  std::unique_ptr<ON_NurbsCurve> TransformControlPointsOfNurbsCurve(const ON_NurbsCurve &curve, const Eigen::Matrix4d &transform);
-       friend bool TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc);
+      // friend bool TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc);
     private:
         fit_parameter_curve   curve_params;
         cv_data curve;

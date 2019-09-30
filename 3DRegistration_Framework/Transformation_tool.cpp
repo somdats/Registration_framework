@@ -671,10 +671,11 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
       return out;
   }
 
-  Eigen::MatrixXf tool::CreateMatrixFromStlVector( std::vector<float> Data,const int row, const int col)
+  Eigen::MatrixXf tool::CreateMatrixFromStlVector(const std::vector<std::vector<float>> &Data,const int row, const int col)
   {
-     
-      Eigen::MatrixXf eigMat2 = Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(Data.data(), row,col);
+      Eigen::MatrixXf eigMat2(row, col);
+      for (int i = 0; i < row; i++)
+         eigMat2.row(i) = Eigen::VectorXf::Map(&Data[i][0], Data[i].size());
       //Eigen::MatrixXf eigMat1 = Eigen::MatrixXf::Zero(row, col);// (Data.data())
       //int row_step = 0;
       //std::cout <<"before:" << eigMat2 << std::endl;
@@ -703,31 +704,55 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
       temp_data.insert(temp_data.end(), std::make_move_iterator(in.data()), std::make_move_iterator(in.data() + in.size()));
       return temp_data;
   }
-  std::vector<float> tool::ReScaleImageBilinear(const std::vector<float> & ImgData, int row_prev, int col_prev, int row_new, int col_new)
+
+  void  tool::Create2DStlVectorFromMatrix(const Eigen::MatrixXf &in, std::vector<std::vector<float>> &out_vector, int row, int col)
+  {
+    //  Eigen::MatrixXf temp_matrix= in;
+     Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>temp_matrix = in;
+     // temp_matrix =  in.transpose();
+      std::vector<std::vector<float>>temp_data_storage_vector(row, std::vector<float>(col));
+     // temp_data_storage_vector.resize(row);
+    
+    /*  typedef Eigen::Matrix<float,Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> RowMatrixXf;
+      Eigen::Map<RowMatrixXf>(&temp_data_storage_vector[0][0], row, col) = in;*/
+      for (int i = 0; i<temp_matrix.rows(); ++i)
+      {
+          const float* begin = &temp_matrix.row(i).data()[0];
+          temp_data_storage_vector[i] = (std::vector<float>(begin, begin + temp_matrix.cols()));
+      }
+    /*  for (int i = 0; i < row; i++)
+      {
+          temp_data_storage_vector[i].insert(temp_data_storage_vector[i].end(), std::make_move_iterator(temp_matrix.row(i).data()), 
+              std::make_move_iterator(temp_matrix.row(i).data() + col));
+      }*/
+      out_vector = std::move(temp_data_storage_vector);
+  }
+
+  std::vector<std::vector<float>> tool::ReScaleImageBilinear(const std::vector<std::vector<float>> &ImgData, int row_prev, int col_prev, int row_new, int col_new)
   {
       int new_size = row_new * col_new;
-      std::vector<float> temp(new_size, -INFINITY);
+      std::vector<std::vector<float>> temp(row_new, std::vector<float>(col_new,-INFINITY));
       float A, B, C, D, gray;
-      float x_ratio = ((float)(col_prev)) / col_new;
-      float y_ratio = ((float)(row_prev)) / row_new;
+      float y_ratio = ((float)(col_prev)) / col_new;
+      float x_ratio = ((float)(row_prev)) / row_new;
       float x_diff, y_diff, ya, yb;
       int offset = 0;
       int  index, x, y;
-      for (int i = 0; i< row_new; i++)
+      for (int i = 0; i < row_new; i++)
       {
-          for (int j = 0; j< col_new; j++)
+          for (int j = 0; j < col_new; j++)
           {
             
              
-              x = (int)(x_ratio * j);
-              y = (int)(y_ratio * i);
+              y = (int)(y_ratio * j);
+              x = (int)(x_ratio * i);
               float accumulate = 0;
               int count = 0;
-              for (int x_itr = x; x_itr < x + x_ratio; x_itr++)
+              for (int x_itr = x; x_itr < x + x_ratio; x_itr++) // x_ratio
               {
-                  for (int y_itr = y; y_itr < y + y_ratio; y_itr++)
+                  for (int y_itr = y; y_itr < y + y_ratio; y_itr++) //y_ratio
                   {
-                      float val = ImgData[y_itr*col_prev + x_itr];
+                      float val = ImgData[x_itr][y_itr];
                       if (val != -INFINITY)
                       {
                           accumulate += val;
@@ -739,54 +764,13 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
 
               }
               if (count > 0)
-                  temp[offset] = std::round(accumulate / float(count));
-            //  x_diff = (x_ratio * j) - x;
-             // y_diff = (y_ratio * i) - y;
-             // index = y*col_prev + x;
-             // std::cout << y << "," << x << "index=" << index << std::endl;
-
-             ////bilinear interpolation
-             // A = ImgData[index] ;
-             // B = ImgData[index + 1];
-             // C = ImgData[index + col_prev] ;
-             // D = ImgData[index + col_prev + 1] ;
-
-             // // Y = A(1-w)(1-h) + B(w)(1-h) + C(h)(1-w) + Dwh
-             ///* if (A != -INFINITY && B != -INFINITY && C != -INFINITY && D != -INFINITY)
-             // {
-             //     gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff) +
-             //         C*(y_diff)*(1 - x_diff) + D*(x_diff*y_diff);
-
-             //     temp[offset] = gray;
-             // }
-             // else if (A != -INFINITY && B != -INFINITY)
-             // {
-             //     gray = A*(1 - x_diff)*(1 - y_diff) + B*(x_diff)*(1 - y_diff);
-             //     temp[offset] = gray;
-             // }
-             // else if (A != -INFINITY && C != -INFINITY)
-             // {
-             //     gray = A*(1 - x_diff)*(1 - y_diff) + C*(y_diff)*(1 - x_diff);
-             //     temp[offset] = gray;
-             // }
-             // else if (A != -INFINITY && D != -INFINITY)
-             // {
-             //     gray = A*(1 - x_diff)*(1 - y_diff) + D*(x_diff*y_diff);
-             //     temp[offset] = gray;
-             // }
-             // else if (B != -INFINITY && C != -INFINITY)
-             // {
-             //     gray = B*(x_diff)*(1 - y_diff) + C*(y_diff)*(1 - x_diff);
-             //     temp[offset] = gray;
-             // }
-             // else if (B != -INFINITY && D != -INFINITY)
-             // {
-             //     gray = B*(x_diff)*(1 - y_diff) + D*(x_diff*y_diff);
-             //     temp[offset] = gray;
-             // }
-             // else
-             //     continue;*/
-             // temp[offset] = ComputeNewPixelValue(A, B, C, D, x_diff, y_diff);
+              {
+                  // some confusion with concept of offset into 2d index as offset was temp[offset]
+                  int ir = offset / col_new;
+                  int ic = offset % col_new;
+                  temp[i][j] = std::round(accumulate / float(count));
+              }
+         
               offset++;
           }
       }

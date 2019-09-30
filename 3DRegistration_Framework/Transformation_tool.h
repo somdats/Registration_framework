@@ -37,8 +37,9 @@ namespace tool
     REG3D_API Eigen::Matrix4f CreateMatrixFromFixedAngleAndTranslation(const double RotAngleinDeg, Eigen::Vector3f rotAxis = Eigen::Vector3f::UnitZ(),
         Eigen::Vector3f translation = Eigen::Vector3f::UnitZ());
     REG3D_API Eigen::MatrixXf RowShiftMatrix(const Eigen::MatrixXf & in, int down);
-    REG3D_API  Eigen::MatrixXf CreateMatrixFromStlVector( std::vector<float> Data, const int row, const int col);
+    REG3D_API  Eigen::MatrixXf CreateMatrixFromStlVector(const std::vector<std::vector<float>>  &Data, const int row, const int col);
     REG3D_API  std::vector<float>CreateStlVectorFromMatirx( Eigen::MatrixXf in);
-    REG3D_API std::vector<float> ReScaleImageBilinear(const std::vector<float> & ImgData, int row_prev, int col_prev, int row_new, int col_new);
+    REG3D_API  void Create2DStlVectorFromMatrix(const Eigen::MatrixXf &in, std::vector<std::vector<float>> &out_vector, int row, int col);
+    REG3D_API std::vector<std::vector<float>> ReScaleImageBilinear(const std::vector<std::vector<float>> &ImgData, int row_prev, int col_prev, int row_new, int col_new);
     REG3D_API std::vector<float> testBilinearInterpolation(std::vector<float>ImgData, int row_prev, int col_prev, int row_new, int col_new);
 }
