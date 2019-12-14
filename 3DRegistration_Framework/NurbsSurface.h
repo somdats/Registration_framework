@@ -1,4 +1,6 @@
 #pragma once
+
+#include<chrono>
 #include"Datatypes.h"
 #include"Config.h"
 #include"nlopt.hpp"
@@ -72,6 +74,14 @@ namespace surface
         std::unique_ptr<CloudWithoutType> GetFittedPointCloud();
        
         static  std::unique_ptr<ON_NurbsSurface> TransformControlPointsOfNurbsSurface(const ON_NurbsSurface &nurb, const Eigen::Matrix4d &transform);
+        static  CloudPtr CreatCloudFromControlPoints(const ON_NurbsSurface &nurb, int &num_pt_xdir, int &num_pt_ydir);
+        static void Generate2DParameterUsingControlPoints(const CloudWithoutType &OriginalCloud, const CloudPtr &ControlPointCloud, const ON_NurbsSurface &nurb,
+           std::vector<Eigen::Vector2d> &st_params);
+
+        static void CreateProjectedPointOnFittedSurface(const CloudWithoutType &OriginalCloud, const std::vector<Eigen::Vector2d> &st_params,
+            const ON_NurbsSurface &nurb, CloudWithoutType &ProjectedCloud, std::vector<Eigen::Vector2d> &optim_st_params);
+        static Eigen::VectorXd  DetermineClosetPointWithoutTrimming(const Eigen::VectorXd &pt_interest, const ON_NurbsSurface &ns,
+            const Eigen::Vector2d &init_st, Eigen::Vector2d &optim_st, double stop_threshold);
         
         static double RayIntersect(const std::vector<double > &x, std::vector<double > &grad, void* f_data);
         static double RayIntersect3D(const std::vector<double > &x, std::vector<double > &grad, void* f_data);
@@ -81,17 +91,21 @@ namespace surface
             std::vector<Eigen::Vector2d> &optim_parameter);
         static double ComputeOptimizedParameterSpaceValue(Ray_Intersect &r_it, double stop_threshold,
             Eigen::Vector2d &optim_parameter, bool use_center = true);
-        static  double OptimizeParameter3D(Ray_Intersect &r_it, double stop_threshold, std::vector<Eigen::Vector2d> &optim_parameter);
+        static  double OptimizeParameter3D(Ray_Intersect &r_it, double stop_threshold, bool use_center, Eigen::Vector2d &optim_parameter);
+
+        static double OptimizeParameter3D(Ray_Intersect &r_it, double stop_threshold, std::vector<Eigen::Vector2d> &optim_parameter);
         static void Optimize( nlopt::opt &optimizer, std::vector<double> &optimized_param, double &error);
         static void CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, const ON_NurbsCurve &Curve, CloudWithNormalPtr &cloud, std::vector<Eigen::Vector2d> &st_params,
             const unsigned  &segX, const unsigned &segY);
      
         static bool EvaluateParameterForCoordinate(std::vector<Eigen::Vector2d> &optim_parameter, const ON_NurbsSurface& ns, 
             const ON_NurbsCurve& nc, Eigen::VectorXd &pt, Eigen::Vector2d &pt_param);
-        static bool cNurbsSurface::EvaluateParameterForCoordinate3D(std::vector<Eigen::Vector2d> &optim_parameter, const ON_NurbsSurface& ns,
+        static bool EvaluateParameterForCoordinate3D(Eigen::Vector2d &optim_parameter, const ON_NurbsSurface& ns,
             const ON_NurbsCurve& nc, Eigen::VectorXd &pt, Eigen::Vector2d &pt_param, int i = 1);
+        static bool EvaluateParameterForCoordinate3D(std::vector<Eigen::Vector2d> &optim_parameter, const ON_NurbsSurface& ns, 
+            const ON_NurbsCurve& nc , Eigen::VectorXd &pt, Eigen::Vector2d &pt_param);
         static Eigen::VectorXd ComputeClosetPointOnNurbSurface(const Eigen::VectorXd &pt_interest, const ON_NurbsSurface &ns,
-            const ON_NurbsCurve &nc, double stop_threshold);
+            const ON_NurbsCurve &nc, const Eigen::Vector2d &init_st,  Eigen::Vector2d &optim_st,double stop_threshold);
        // friend bool TrimInputSurfaceUsingCurveBoundary( vec2d & vec_2d, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc);
         data GetNurbSurfaceData();
        

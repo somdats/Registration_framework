@@ -748,9 +748,9 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
               x = (int)(x_ratio * i);
               float accumulate = 0;
               int count = 0;
-              for (int x_itr = x; x_itr < x + x_ratio; x_itr++) // x_ratio
+              for (int x_itr = x; x_itr < x +(int)( x_ratio); x_itr++) // x_ratio
               {
-                  for (int y_itr = y; y_itr < y + y_ratio; y_itr++) //y_ratio
+                  for (int y_itr = y; y_itr < y + (int)(y_ratio); y_itr++) //y_ratio
                   {
                       float val = ImgData[x_itr][y_itr];
                       if (val != -INFINITY)

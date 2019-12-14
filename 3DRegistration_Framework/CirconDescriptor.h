@@ -35,6 +35,8 @@ struct descriptor_Value
     }
     descriptor_Value& operator =(const descriptor_Value &temp)
     {
+        if (this == &temp)
+            return *this;
         row_idx = temp.row_idx;
         col_idx = temp.col_idx;
         pix_idx = temp.pix_idx;
@@ -44,6 +46,7 @@ struct descriptor_Value
         pt = temp.pt;
         return *this;
     }
+  
     bool operator<(const descriptor_Value& a)
     {
         return col_idx < a.col_idx;
@@ -105,7 +108,7 @@ public:
    
     CirconImageDescriptor & operator=(const CirconImageDescriptor &cid); // asignment
     CirconImageDescriptor( const CirconImageDescriptor &cid);  // copy constructor
-    void ComputeFeature(const CUniformGrid2D &cGrid2D);
+    void ComputeFeature(const CUniformGrid2D &cGrid2D, const cParameterGrid &_pGrid);
     void ComputeFeature(int i);
     void SetAngularResolution(float angle_resolution, int num_division);
     void SetRadialResolution(float distance, int num_division);
@@ -148,7 +151,7 @@ public:
     float GetRadiusFromCloud();  // useful for computing radial resolution
     void SetMaximumRadius(float rad);
     std::vector<std::vector<_dV>> GetDescriptorContent();
-    void CreateSecondaryDescriptor(const Eigen::VectorXd &pt);
+    void CreateSecondaryDescriptor(const Eigen::VectorXd &pt, const cParameterGrid & pGrid);
     std::unique_ptr<ON_NurbsSurface> GetNurbsSurface();
     std::unique_ptr<ON_NurbsCurve> GetNurbsCurve();
     void SetNurbsSurfaceAndCurve(const ON_NurbsSurface &nbs);
@@ -168,7 +171,10 @@ public:
     void ResetFlagForHighResolution();
     void SetUpResolutionCount(int res);
     float GetAverageDist();
-    
+    std::vector<Eigen::Vector2d> GetInitialParameters();
+    void setParametergrid(const cParameterGrid &pGrid);
+   cParameterGrid GetParameterGrid();
+   std::unique_ptr<cParameterGrid> duplicate(std::unique_ptr<cParameterGrid> const& ptr);
   
 protected:
     CloudWithoutType inputCloud;
@@ -212,6 +218,7 @@ protected:
     float avgpoint_dist;
     bool high_res_flag = false;
     int up_resolution_count = 16;
+   // cParameterGrid _pGrid;
  
 };
 

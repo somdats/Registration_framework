@@ -38,6 +38,24 @@ CUniformGrid2D::CUniformGrid2D(double grid_size, PointAccessor &&pointAccessor,
 CUniformGrid2D::~CUniformGrid2D()
 {}
 
+CUniformGrid2D& CUniformGrid2D:: operator=(const CUniformGrid2D & _grid)
+{
+    if (this == &_grid)
+        return *this;
+    grid_size = _grid.grid_size;
+    grid = _grid.grid;
+    pointAccess = _grid.pointAccess;
+    return *this;
+
+}
+
+CUniformGrid2D::CUniformGrid2D(const CUniformGrid2D & _grid)
+{
+    grid = _grid.grid;
+    grid_size = _grid.grid_size;
+    pointAccess = _grid.pointAccess;
+}
+
 void CUniformGrid2D::build (void)
 {
 	// Check if already built
@@ -168,4 +186,68 @@ bool CUniformGrid2D::query (std::vector<size_t>* out, const Vec2& query,
 
 	// Done!
 	return !(out->empty());
+}
+
+cParameterGrid::cParameterGrid()
+{
+
+}
+
+cParameterGrid::cParameterGrid(double grid_size, PtAccessor &&pointAccessor,
+    bool buildImmediatly)
+    : grid_size(grid_size), pointAccess(std::move(pointAccessor))
+{
+    if (buildImmediatly)
+        build();
+}
+cParameterGrid& cParameterGrid:: operator=(const cParameterGrid & _grid)
+{
+    if (this == &_grid)
+        return *this;
+    grid_size = _grid.grid_size;
+    grid = _grid.grid;
+    pointAccess = _grid.pointAccess;
+    return *this;
+
+}
+
+cParameterGrid::cParameterGrid(const cParameterGrid & _grid)
+{
+    grid = _grid.grid;
+    grid_size = _grid.grid_size;
+    pointAccess = _grid.pointAccess;
+}
+
+
+
+cParameterGrid ::~cParameterGrid()
+{
+
+}
+void cParameterGrid::build(void)
+{
+    // Check if already built
+    if (!grid.empty())
+        return;
+
+    // Request all points from client, one by one
+    double attrib_dummy; Vec2 point;
+    for (unsigned i = 0; pointAccess(&point, &attrib_dummy, i); i++)
+    {
+        // Quantized position of the point
+        Cell cell = Cell::get(point, grid_size);
+        // Insert into grid
+        grid[cell].push_back(i);
+    }
+}
+bool cParameterGrid::query(const Vec2 &query)const
+{
+    Cell _q = Cell::get(query, grid_size);
+    auto cell = grid.find({ _q.x , _q.y });
+    if (cell != grid.end())
+    {
+        return true;
+    }
+    else
+        return false;
 }

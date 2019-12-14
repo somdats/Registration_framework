@@ -160,8 +160,14 @@ bool surface::TrimInputSurfaceUsingCurveBoundary(vec2d & vec_2d, const ON_NurbsS
         param = pcl::on_nurbs::FittingCurve2dAPDM::inverseMappingO2(nc, vec_2d, err, pc, tc);
     else
     {
+        auto start = std::chrono::high_resolution_clock::now();
         param = pcl::on_nurbs::FittingCurve2dAPDM::findClosestElementMidPoint(nc, vec_2d);
         param = pcl::on_nurbs::FittingCurve2dAPDM::inverseMapping(nc, vec_2d, param, err, pc, tc, rScale);
+        auto end = std::chrono::high_resolution_clock::now();
+        double trim_time = std::chrono::duration_cast<
+            std::chrono::duration<double, std::milli>>(end - start).count();
+        trim_time = trim_time / double(1000);
+      //   std::cout << " trimmming:" << trim_time << std::endl;
     }
 
     Eigen::Vector3d a(vec_2d(0) - pc(0), vec_2d(1) - pc(1), 0.0);
@@ -201,7 +207,66 @@ std::unique_ptr<ON_NurbsSurface> cNurbsSurface::TransformControlPointsOfNurbsSur
     return std::make_unique<ON_NurbsSurface>(nurb_new);
    
 }
+  CloudPtr  cNurbsSurface::CreatCloudFromControlPoints(const ON_NurbsSurface &nurb, int &num_pt_xdir, int &num_pt_ydir)
+{
+      pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
+      int max_idx_row = nurb.CVCount(0);
+      int max_idx_col = nurb.CVCount(1);
+      int nr_control_point = nurb.CVCount();
+      for (int i = 0; i < max_idx_row; i++)
+      {
+          for (int j = 0; j < max_idx_col; j++)
+          {
 
+              ON_4dPoint pt;
+              nurb.GetCV(i, j, pt);
+              pcl::PointXYZ pcl_pt;
+              pcl_pt.x = pt.x;
+              pcl_pt.y = pt.y;
+              pcl_pt.z = pt.z;
+              cloud_cluster->points.push_back(pcl_pt);
+              if (cloud_cluster->points.size() == 2091)
+              {
+                  std::cout << i << "," << j << std::endl;
+              }
+
+          }
+      }
+      cloud_cluster->width = cloud_cluster->points.size();
+      cloud_cluster->height = 1;
+      cloud_cluster->is_dense = true;
+      num_pt_xdir = max_idx_col;
+      num_pt_ydir - max_idx_row;
+      return cloud_cluster;
+}
+ void cNurbsSurface::Generate2DParameterUsingControlPoints(const CloudWithoutType &OriginalCloud, const CloudPtr &ControlPointCloud, const ON_NurbsSurface &nurb,
+      std::vector<Eigen::Vector2d> &st_params)
+  {
+     CloudPtr cloudTemp(new pcl::PointCloud<PointType>);
+     pcl::fromPCLPointCloud2(*OriginalCloud, *cloudTemp);
+     size_t numPoint = cloudTemp->points.size();
+     // create kdtree for control-points cloud
+     pcl::search::KdTree<pcl::PointXYZ>::Ptr kTree(new pcl::search::KdTree<pcl::PointXYZ>);
+     kTree->setInputCloud(ControlPointCloud);
+     int max_idx_col = (nurb.CVCount(1));
+     int max_idx_row = (nurb.CVCount(0));
+     for (size_t itr = 0; itr < numPoint; itr++)
+     {
+         if (itr == 34249)
+             std::cout << itr << std::endl;
+         PointType qPt = cloudTemp->points[itr];
+         std::vector<int>indices;
+         std::vector<float>distances;
+         kTree->nearestKSearch(qPt, 1, indices, distances);
+         int row_idx = (indices[0]) / max_idx_col;
+         int col_idx = (indices[0]) % max_idx_col;
+         Eigen::Vector2d st;
+         st.y() = (1.0 / static_cast<double> (max_idx_col)) * static_cast<double> (col_idx);
+         st.x() = (1.0 / static_cast<double>(max_idx_row)) * static_cast<double>(row_idx);
+         st_params.push_back(st);
+
+     }
+  }
 double cNurbsSurface:: RayIntersect(const std::vector<double > &x, std::vector<double > &grad, void* f_data)
 {
     const Ray_Intersect *raydata = static_cast<Ray_Intersect*>(f_data);
@@ -477,12 +542,94 @@ double cNurbsSurface::ComputeOptimizedParameterSpaceValue(Ray_Intersect &r_it, d
        
      }
  }
+double cNurbsSurface::OptimizeParameter3D(Ray_Intersect &r_it, double stop_threshold, bool use_center, Eigen::Vector2d &optim_parameter)
+{
+    // set up optimizer
+  
+    double error1 = INF, error2 = INF, error3 = INF, error4 = INF;
+    double min_error = INF;
+
+    double x_diff = r_it.init_param(0) - 0.5;
+    double y_diff = r_it.init_param(1) - 0.5;
+
+    Eigen::Matrix<bool, 2, 1>quadrant;
+
+    quadrant.x() = x_diff > 0.0;
+    quadrant.y() = y_diff > 0.0;
+    bool horizontal = false;
+    double options[LM_OPTS_SZ] = {
+        std::sqrt(LM_INIT_MU),     /* Initial dampening factor */
+        std::sqrt(LM_STOP_THRESH), /* epsilon_1 */
+        std::sqrt(LM_STOP_THRESH), /* epsilon_2 */
+        std::sqrt(LM_STOP_THRESH), /* epsilon_3 */
+        -1e-4                       /* Finite differences delta (pos.: forward, neg.: central) */
+    };
+    double info[LM_INFO_SZ];
+    for (int i = 0; i < 1 + 3 * static_cast<int>(use_center); i++)
+    {
+
+        std::vector<double>q;
+        if (use_center || i > 0)
+            q = { r_it.x0 + r_it.w *(0.25 + 0.5 * double(quadrant(0))), r_it.y0 + r_it.h * (0.25 + 0.5 * double(quadrant(1))) };
+        else if (i == 0)
+        {
+            q = { r_it.init_param(0), r_it.init_param(1) };
+        }
+        // Optimize(optim, q, error1);
+
+        int num_iters4 = dlevmar_dif(objfn_adapter3D, q.data(), 0, 2, 2, 1048576, options, info, 0, 0, &r_it);
+        if (q[0] >= r_it.x0 && q[0] <= r_it.x1 && q[1] >= r_it.y0 && q[1] <= r_it.y1  && info[1] < 1e-4)
+        {
+
+            optim_parameter = (Eigen::Vector2d(q[0], q[1]));
+            break;
+
+        }
+        if (i == 0)
+        {
+            if (abs(x_diff) > abs(y_diff))
+            {
+                quadrant.y() = !quadrant.y();
+            }
+            else
+            {
+                quadrant.x() = !quadrant.x();
+                horizontal = true;
+            }
+        }
+        else if (i == 1)
+        {
+            quadrant.x() = !quadrant.x();
+            quadrant.y() = !quadrant.y();
+        }
+        else if (i == 2)
+        {
+            if (horizontal)
+            {
+                quadrant.x() = !quadrant.x();
+            }
+            else
+                quadrant.y() = !quadrant.y();
+        }
+    }
+    if (optim_parameter[0] >= r_it.x0 && optim_parameter[0] <= r_it.x1 && optim_parameter[1] >= r_it.y0 && optim_parameter[1] <= r_it.y1
+        && info[1] < 1e-4)
+    {
+
+        return  info[1];
+
+    }
+    else
+    {
+        return  error1;
+    }
+
+}
 double cNurbsSurface::OptimizeParameter3D(Ray_Intersect &r_it, double stop_threshold, std::vector<Eigen::Vector2d> &optim_parameter)
 {
-  
     nlopt::opt optim(LN_NELDERMEAD, 2);
     optim.set_xtol_abs(1e-4);
-   // optim.set_stopval(stop_threshold);
+    // optim.set_stopval(stop_threshold);
     optim.set_min_objective(RayIntersect3D, &r_it);
     double error1 = INF, error2 = INF, error3 = INF, error4 = INF;
     double min_error = INF;
@@ -501,11 +648,11 @@ double cNurbsSurface::OptimizeParameter3D(Ray_Intersect &r_it, double stop_thres
         std::sqrt(LM_STOP_THRESH), /* epsilon_3 */
         -1e-4                       /* Finite differences delta (pos.: forward, neg.: central) */
     };
-   
+
 
 
     std::vector<double>q = { r_it.x0 + r_it.w * 0.25, r_it.y0 + r_it.h * 0.25 };
-   // optim.optimize(q, error1);
+    // optim.optimize(q, error1);
     int num_iters1 = dlevmar_dif(objfn_adapter3D, q.data(), 0, 2, 3, 1048576, options, info1, 0, 0, &r_it);
     if (q[0] >= r_it.x0 && q[0] <= r_it.x1 && q[1] >= r_it.y0 && q[1] <= r_it.y1)
     {
@@ -534,7 +681,7 @@ double cNurbsSurface::OptimizeParameter3D(Ray_Intersect &r_it, double stop_thres
     }
 
     std::vector<double>s = { r_it.x0 + r_it.w * 0.75, r_it.y0 + r_it.h * 0.75 };
-   // optim.optimize(s, error3);
+    // optim.optimize(s, error3);
     int num_iters3 = dlevmar_dif(objfn_adapter3D, s.data(), 0, 2, 3, 1048576, options, info3, 0, 0, &r_it);
     if (s[0] >= r_it.x0 && s[0] <= r_it.x1 && s[1] >= r_it.y0 && s[1] <= r_it.y1)
     {
@@ -548,7 +695,7 @@ double cNurbsSurface::OptimizeParameter3D(Ray_Intersect &r_it, double stop_thres
     }
 
     std::vector<double>t = { r_it.x0 + r_it.w *0.75, r_it.y0 + r_it.h *0.25 };
-   // optim.optimize(t, error4);
+    // optim.optimize(t, error4);
     int num_iters4 = dlevmar_dif(objfn_adapter3D, t.data(), 0, 2, 3, 1048576, options, info4, 0, 0, &r_it);
     if (t[0] >= r_it.x0 && t[0] <= r_it.x1 && t[1] >= r_it.y0 && t[1] <= r_it.y1)
     {
@@ -562,10 +709,9 @@ double cNurbsSurface::OptimizeParameter3D(Ray_Intersect &r_it, double stop_thres
     }
 
     optim_parameter[0] = min_parameter;
-   // std::cout << "minimum_error for closest point:" << min_error << std::endl;
+    // std::cout << "minimum_error for closest point:" << min_error << std::endl;
     return min_error;
-}
-
+ }
 bool cNurbsSurface::EvaluateParameterForCoordinate(std::vector<Eigen::Vector2d> &optim_parameter, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc
 , Eigen::VectorXd &pt, Eigen::Vector2d &pt_param)
 {
@@ -599,7 +745,7 @@ bool cNurbsSurface::EvaluateParameterForCoordinate(std::vector<Eigen::Vector2d> 
     return inside;
 }
 
-bool cNurbsSurface::EvaluateParameterForCoordinate3D(std::vector<Eigen::Vector2d> &optim_parameter, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc
+bool cNurbsSurface::EvaluateParameterForCoordinate3D(Eigen::Vector2d &optim_parameter, const ON_NurbsSurface& ns, const ON_NurbsCurve& nc
     , Eigen::VectorXd &pt, Eigen::Vector2d &pt_param, int i)
 {
     double z_coordinate_max = -INF;
@@ -612,11 +758,11 @@ bool cNurbsSurface::EvaluateParameterForCoordinate3D(std::vector<Eigen::Vector2d
     surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(nc, a0, a1, scale);
     /*for (Eigen::Vector2d vec2d : optim_parameter)
     {*/
-        inside = TrimInputSurfaceUsingCurveBoundary(optim_parameter[0], ns, nc,a0,a1,scale);
+        inside = TrimInputSurfaceUsingCurveBoundary(optim_parameter, ns, nc,a0,a1,scale);
         if (inside)
         {
             Eigen::Vector3d vec3[3];
-            ns.Evaluate(optim_parameter[0][0], optim_parameter[0][1], 1, 3, &vec3[0][0]);
+            ns.Evaluate(optim_parameter(0), optim_parameter(1), 1, 3, &vec3[0][0]);
            /* if (vec3[0][2] > z_coordinate_max)
             {*/
                 z_coordinate_max = vec3[0][2];
@@ -624,14 +770,45 @@ bool cNurbsSurface::EvaluateParameterForCoordinate3D(std::vector<Eigen::Vector2d
                 vec3[2].normalize();
                 pt.head<3>() = vec3[0];
                 pt.tail<3>() = (vec3[1].cross(vec3[2])).normalized();
-                pt_param = optim_parameter[0];
+                pt_param = optim_parameter;
           /*  }*/
 
         }
  /*   }*/
     return inside;
 }
+ bool cNurbsSurface::EvaluateParameterForCoordinate3D(std::vector<Eigen::Vector2d> &optim_parameter, const ON_NurbsSurface& ns,
+    const ON_NurbsCurve& nc, Eigen::VectorXd &pt, Eigen::Vector2d &pt_param)
+{
+    double z_coordinate_max = -INF;
+    bool inside = false;
+    pt = Eigen::VectorXd::Zero(6);
+    if (optim_parameter.size() <= 0)
+        return inside;
+    Eigen::Vector3d a0, a1;
+    double scale;
+    surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(nc, a0, a1, scale);
+    /*for (Eigen::Vector2d vec2d : optim_parameter)
+    {*/
+    inside = TrimInputSurfaceUsingCurveBoundary(optim_parameter[0], ns, nc, a0, a1, scale);
+    if (inside)
+    {
+        Eigen::Vector3d vec3[3];
+        ns.Evaluate(optim_parameter[0][0], optim_parameter[0][1], 1, 3, &vec3[0][0]);
+        /* if (vec3[0][2] > z_coordinate_max)
+        {*/
+        z_coordinate_max = vec3[0][2];
+        vec3[1].normalize();
+        vec3[2].normalize();
+        pt.head<3>() = vec3[0];
+        pt.tail<3>() = (vec3[1].cross(vec3[2])).normalized();
+        pt_param = optim_parameter[0];
+        /*  }*/
 
+    }
+    /*   }*/
+    return inside;
+}
 void cNurbsSurface::CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, const ON_NurbsCurve &Curve, CloudWithNormalPtr &cloud, std::vector<Eigen::Vector2d> &st_params, const unsigned  &segX, const unsigned &segY)
 {
   double x0 = nurb.Knot(0, 0);
@@ -689,7 +866,7 @@ void cNurbsSurface::CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, 
 }
 
 Eigen::VectorXd cNurbsSurface::ComputeClosetPointOnNurbSurface(const Eigen::VectorXd &pt_interest, const ON_NurbsSurface &ns,
-    const ON_NurbsCurve &nc, double stop_threshold)
+    const ON_NurbsCurve &nc, const Eigen::Vector2d &init_st, Eigen::Vector2d &optim_st, double stop_threshold)
 {
     surface::Ray_Intersect r_it(ns);
     r_it.x0 = ns.Knot(0, 0);
@@ -698,17 +875,79 @@ Eigen::VectorXd cNurbsSurface::ComputeClosetPointOnNurbSurface(const Eigen::Vect
     r_it.y0 = ns.Knot(1, 0);
     r_it.y1 = ns.Knot(1, ns.KnotCount(1) - 1);
     r_it.h = r_it.y1 - r_it.y0;
-
+   // r_it.init_param = init_st;
     r_it.xyz = pt_interest.head<3>();
 
     // compute the optimized parameter (s,t) 
-    std::vector<Eigen::Vector2d>optim_paramter;
-    double min_error = surface::cNurbsSurface::OptimizeParameter3D(r_it, stop_threshold, optim_paramter);
+   // Eigen::Vector2d optim_paramter;
 
+    bool use_center = false;
+    std::vector<Eigen::Vector2d>optim_paramter;
+   // double min_error = surface::cNurbsSurface::OptimizeParameter3D(r_it, stop_threshold, use_center, optim_paramter);
+    double min_error = surface::cNurbsSurface::OptimizeParameter3D(r_it, stop_threshold, optim_paramter);
     Eigen::VectorXd pt;
     Eigen::Vector2d parameter;
 
     // closest point on the nurb surface
-   surface::cNurbsSurface::EvaluateParameterForCoordinate3D(optim_paramter, ns, nc, pt, parameter);
+    surface::cNurbsSurface::EvaluateParameterForCoordinate3D(optim_paramter, ns, nc, pt, parameter);
+    // closest point on the nurb surface
+  // surface::cNurbsSurface::EvaluateParameterForCoordinate3D(optim_paramter, ns, nc, pt, parameter);
    return pt;
+}
+Eigen::VectorXd cNurbsSurface::DetermineClosetPointWithoutTrimming(const Eigen::VectorXd &pt_interest, const ON_NurbsSurface &ns,
+    const Eigen::Vector2d &init_st, Eigen::Vector2d &optim_st, double stop_threshold)
+{
+    surface::Ray_Intersect r_it(ns);
+    r_it.x0 = ns.Knot(0, 0);
+    r_it.x1 = ns.Knot(0, ns.KnotCount(0) - 1);
+    r_it.w = r_it.x1 - r_it.x0;
+    r_it.y0 = ns.Knot(1, 0);
+    r_it.y1 = ns.Knot(1, ns.KnotCount(1) - 1);
+    r_it.h = r_it.y1 - r_it.y0;
+    r_it.init_param = init_st;
+    r_it.xyz = pt_interest.head<3>();
+
+    bool use_center = false;
+    double min_error = surface::cNurbsSurface::OptimizeParameter3D(r_it, stop_threshold, use_center, optim_st);
+
+    // closest point on the nurb surface
+    Eigen::Vector3d vec3[3];
+    Eigen::VectorXd pt = Eigen::VectorXd::Zero(6);
+    ns.Evaluate(optim_st(0), optim_st(1), 1, 3, &vec3[0][0]);
+    pt.head<3>() = vec3[0];
+    pt.tail<3>() = (vec3[1].cross(vec3[2])).normalized();
+    return pt;
+}
+void cNurbsSurface::CreateProjectedPointOnFittedSurface(const CloudWithoutType &OriginalCloud, const std::vector<Eigen::Vector2d> &st_params,
+     const ON_NurbsSurface &nurb, CloudWithoutType &ProjectedCloud, std::vector<Eigen::Vector2d> &optim_st_params)
+{
+    CloudWithNormalPtr converted_cloud(new pcl::PointCloud<PointNormalType>);
+    // op cloud
+    CloudWithNormalPtr sampled_cloud(new pcl::PointCloud<PointNormalType>);
+    pcl::fromPCLPointCloud2(*OriginalCloud, *converted_cloud);
+
+    size_t  numSize = converted_cloud->points.size();
+
+    optim_st_params.clear();
+    optim_st_params.reserve(numSize);
+    for (size_t i = 0; i < numSize; i++)
+    {
+        if (i == 34249)
+            std::cout << i << std::endl;
+        Eigen::VectorXd pt_target = Eigen::VectorXd::Zero(6);
+        pt_target.head<3>() = converted_cloud->points[i].getVector3fMap().cast<double>();
+        pt_target.tail<3>() = converted_cloud->points[i].getNormalVector3fMap().cast<double>();
+        Eigen::Vector2d init_param = st_params[i];
+        Eigen::Vector2d optim_param;
+        Eigen::VectorXd cp_target = surface::cNurbsSurface::DetermineClosetPointWithoutTrimming(pt_target, nurb, init_param, optim_param, 1e-5);
+        PointNormalType pt;
+        pt.getVector3fMap() = cp_target.head<3>().cast<float>();
+        pt.getNormalVector3fMap() = cp_target.tail<3>().cast<float>();
+        sampled_cloud->points.push_back(pt);
+        optim_st_params.push_back(optim_param);
+    }
+    sampled_cloud->width = sampled_cloud->points.size();
+    sampled_cloud->height = 1;
+    sampled_cloud->is_dense = true;
+    pcl::toPCLPointCloud2(*sampled_cloud, *ProjectedCloud);
 }

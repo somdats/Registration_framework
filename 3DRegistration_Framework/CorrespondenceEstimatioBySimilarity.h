@@ -29,6 +29,8 @@ public:
         num_resolution(nr_resolution),
         nr_search_col(col_search),
         _write(write_data),
+        src_cloud_parameter(src_st),
+        tgt_cloud_parameter(tgt_st),
         original_src_cloud_with_normal(new pcl::PointCloud <PointNormalType>)
     {
         pcl::fromPCLPointCloud2(*sourceCloud, *original_src_cloud_with_normal);
@@ -47,12 +49,50 @@ public:
         int primary_idx;
         float pix_value;
         std::vector<std::vector<_dV>> descriptor_content;
+        Measure()
+        {
+            similarity_value = -1.0;
+        }
+        Measure& operator=(const Measure &M)
+        {
+            if (this == &M)
+                return *this;
+            similarity_value = M.similarity_value;
+            cell_index = M.cell_index;
+            rotation_index = M.rotation_index;
+            cell_values = M.cell_values;
+            point_of_interest = M.point_of_interest;
+            point_index = M.point_index;
+            WlTransform = M.WlTransform;
+            img_pt_index_map = M.img_pt_index_map;
+            primary_idx = M.primary_idx;
+            pix_value = M.pix_value;
+            descriptor_content = M.descriptor_content;
+            return *this;
+        }
+        Measure(const Measure &M)
+        {
+          
+            similarity_value = M.similarity_value;
+            cell_index = M.cell_index;
+            rotation_index = M.rotation_index;
+            cell_values = M.cell_values;
+            point_of_interest = M.point_of_interest;
+            point_index = M.point_index;
+            WlTransform = M.WlTransform;
+            img_pt_index_map = M.img_pt_index_map;
+            primary_idx = M.primary_idx;
+            pix_value = M.pix_value;
+            descriptor_content = M.descriptor_content;
+
+        }
     };
     typedef PointData<float> PointDataType;
     void PrepareDataForCorrespondenceEstimation(CloudWithoutType &srcCloud, CloudWithoutType &tarCloud);
     search::ISearch* getSearchStrategy()const;
     Eigen::Matrix4f ComputeTransformation();
-    void PrepareDescriptor(CirconImageDescriptor& cid, PointNormalType rotpoint);
+    void PrepareDescriptor(CirconImageDescriptor& cid, PointNormalType rotpoint, const bool &use_nurbs_strategy = true, 
+        const bool &cloud_type = false);
     void PrepareTargetDescriptor(PointNormalType rotpoint);
     //TODO functions to select point of interest in source and target cloud
     float ComputeMeasureOfSimilarity(std::vector<std::vector<float>> &src_image, std::vector<std::vector<float>> &tar_image);
@@ -95,6 +135,8 @@ int &rotation_idx, int &secondary_dsc_posn);
      Eigen::Vector3d &V_min);
  void SetBoundingBoxForDescriptors(surface::CloudBoundingBox &src_bbs, surface::CloudBoundingBox &tgt_bbs); 
  CloudPtr Construct2DCloudForKdtreeSearch(const CloudWithNormalPtr &inputCloud, const Eigen::Matrix4f &WorldLocalTransformation);
+ std::pair<int, float>  ComputeRotationIndex(const std::vector<std::vector<float>> &src_desc,  std::vector<std::vector<float>> &tar_desc,
+     int row, int col);
    
 
 
@@ -132,6 +174,8 @@ protected:
     float maximum_radius;
     CloudPtr cloud_with_2d_points;
     bool high_flag = false;
+    std::vector<Eigen::Vector2d> src_cloud_parameter;
+    std::vector<Eigen::Vector2d> tgt_cloud_parameter;
    /* std::map<PointDataType, int>source_correspondence_map;
     std::map<PointDataType, int>target_correspondence_map;*/
    // std::vector<std::vector<float>> ResScaleTargetDescriptor(const std::vector<std::vector<float>> &Descriptor_Current);
@@ -141,5 +185,7 @@ protected:
     float ReScaleAndEvaluateDescriptorForMaximumRotation(const std::vector<std::vector<float>>& src_descriptors,
         const std::vector<std::vector<float>>& target_descriptors, int& rotation_idx, std::vector<std::vector<float>> &max_descriptor, int min_res = 8);
     int up_resolution_count;
+    cParameterGrid cParam_Source;
+    cParameterGrid cParam_target;
     
 };
