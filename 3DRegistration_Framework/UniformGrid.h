@@ -274,7 +274,7 @@ public:
     *		Populates the grid with the data points provided by the @ref #PointAccessor .
     *		Does not do anything if the grid was already built by the constructor.
     */
-    void build(void);
+    void buildgrid(void);
 
     /**
     * @brief

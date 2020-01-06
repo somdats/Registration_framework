@@ -12,6 +12,10 @@
 
 namespace
 {
+    bool cmp(const CirconCorrespondence::Measure& lhs, const CirconCorrespondence::Measure& rhs)
+    {
+        return lhs.similarity_value < rhs.similarity_value;
+    }
    
     Eigen::Vector3f project(Eigen::Vector3f origin, Eigen::Vector3f normal, Eigen::Vector3f point)
     {
@@ -146,9 +150,9 @@ namespace
             {
                 if (descriptors[ir][ic].val_at_pixel != -INFINITY )
                 {
-                    PointNormalType pt;
-                   pt.getVector3fMap() =  descriptors[ir][ic].pt.head<3>().cast<float>();
-                   pt.getNormalVector3fMap() = descriptors[ir][ic].pt.tail<3>().cast<float>();
+                    PointNormalType pt = descriptors[ir][ic].pt;
+                  /* pt.getVector3fMap() =  descriptors[ir][ic].pt.head<3>().cast<float>();
+                   pt.getNormalVector3fMap() = descriptors[ir][ic].pt.tail<3>().cast<float>();*/
                    /* PointNormalType pt(descriptors[ir][ic].pt(0), descriptors[ir][ic].pt(1), descriptors[ir][ic].pt(2), descriptors[ir][ic].pt(3),
                         descriptors[ir][ic].pt(4), descriptors[ir][ic].pt(5));*/
                     reconstructed_points.push_back(pt);
@@ -178,20 +182,30 @@ namespace
         fclose(pFile);
     }
 
-    CirconCorrespondence::Measure FindMaximumSimilarityInIterations(const std::vector <CirconCorrespondence::Measure>& m)
+    size_t FindMaximumSimilarityInIterations(const std::vector <CirconCorrespondence::Measure>& m)
     {
 
-        float value = -INFINITY;
+      //  auto max_it = std::max_element(m.begin(), m.end(), cmp);
+
+        auto it = m.begin();
+        float value = it++->similarity_value;
         CirconCorrespondence::Measure max_similarity;
-        for (auto const& ms : m)
+        size_t idx_count = 0;
+        for (;it !=m.end(); it++)
         {
-            if (ms.similarity_value > value)
+            if (it->similarity_value > 0)
             {
-                value = ms.similarity_value;
-                max_similarity = ms;
+                if (it->similarity_value > value)
+                {
+                    value = it->similarity_value;
+                    idx_count = it - m.begin();
+                }
             }
         }
-        return max_similarity;
+     
+      //  std::cout << "similarity_value:" << max_it->similarity_value << "," << m[idx_count].similarity_value << std::endl;
+      //  return *max_it;
+        return idx_count;
     }
     std::vector<std::vector<float>> ScaleImageData(const std::vector<std::vector<float>>&data, int num_division_row, int num_division_col)
     {
@@ -509,7 +523,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
     );
    // cid_target.setParametergrid(cParam_tar);
     cParam_target = cParam_tar;
-    for (tIndex = 36; tIndex < 42; tIndex++)
+    for (tIndex = 9; tIndex < 15; tIndex++)
     {
       
         // find closet point on nurb surface for a give pt. of interest
@@ -541,7 +555,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
           local_tfs_target.cast<double>());
       cid_target.SetNurbsSurfaceAndCurve(*nb_surface_tfs);*/
        
-        for (sIndex = 24; sIndex < 30; sIndex++)  //16 -20 for oilpump
+        for (sIndex = 80; sIndex < 86; sIndex++)  //16 -20 for oilpump
         {
           
             // find closet point on nurb surface for a give pt. of interest
@@ -628,8 +642,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                     cid_target.WritePointCloud(TarCloudName);
                 }
 
-
-                Measure ms = CompareDescriptor(source_descriptor_image, target_descriptor_image,1); //CompareDescriptorWithSimilarityMeasure
+                CompareDescriptor(source_descriptor_image, target_descriptor_image,1); //CompareDescriptorWithSimilarityMeasure
 
                /* if (ms.similarity_value < tow_ms)
                 {
@@ -637,8 +650,8 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                 }*/
                /* else
                 {*/
-                    tow_ms = std::pow(0.80, level_itr + 1) * ms.similarity_value;
-                    ms_max = ms;
+                    tow_ms = std::pow(0.80, level_itr + 1) * max_measure.similarity_value;
+                    ms_max = max_measure;
                     T2 = ms_max.WlTransform; // cid_source.GetTransformation();
                     T1 = cid_target.GetTransformation();
                     float theta = cid_source.GetAngularResolution();
@@ -790,8 +803,8 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                 }
                 else  // increase resolution
                 {
-                    src_corres = ms.point_of_interest;
-                    source_basic_index = ms.point_index;
+                    src_corres = max_measure.point_of_interest;
+                    source_basic_index = max_measure.point_index;
                     // reduce the no. of cols to evaluate by half and modify the resolution
                     nr_search_col = nr_search_col / 2;
                     incr_reslolution = level_itr + 1;
@@ -977,8 +990,10 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
             {
                 /*if (src_count < 3)
                 {*/
-                    src_centroid = src_centroid + itr.pt.head<3>().cast<float>();
-                    src_centroid_normal = src_centroid_normal + itr.pt.tail<3>().cast<float>();
+                src_centroid = src_centroid + itr.pt.getVector3fMap();
+                src_centroid_normal = src_centroid_normal + itr.pt.getNormalVector3fMap();
+     /*               src_centroid = src_centroid + itr.pt.head<3>().cast<float>();
+                    src_centroid_normal = src_centroid_normal + itr.pt.tail<3>().cast<float>();*/
                     src_count++;
                     std::cout << " fictituous increment:" << incr << "," << "row_index:" << r << std::endl;
                /* }
@@ -1276,14 +1291,14 @@ CirconImageDescriptor CirconCorrespondence::TransformCirconDescriptor(int index)
  
     return transformed_descriptor;
 }
-CirconImageDescriptor CirconCorrespondence::TransformCirconDescriptor(const Eigen::VectorXd &pt)
+CirconImageDescriptor CirconCorrespondence::TransformCirconDescriptor(const PointNormalType/*Eigen::VectorXd*/ &pt)
 {
     CirconImageDescriptor transformed_descriptor = cid_source;
     transformed_descriptor.SetBasicPointIndex(-1);
     transformed_descriptor.SetMaximumRadius(maximum_radius);
-    PointNormalType rotpoint;
-    rotpoint.getVector3fMap() = pt.head<3>().cast<float>();
-    rotpoint.getNormalVector3fMap() = pt.tail<3>().cast<float>();
+    PointNormalType rotpoint = pt;
+   /* rotpoint.getVector3fMap() = pt.head<3>().cast<float>();
+    rotpoint.getNormalVector3fMap() = pt.tail<3>().cast<float>();*/
     transformed_descriptor.SetRotationAxisPoint(rotpoint);
     transformed_descriptor.ConstructLocalFrameOfReference();
  /*  auto grid = cid_source.GetParameterGrid();
@@ -1296,23 +1311,17 @@ CirconImageDescriptor CirconCorrespondence::TransformCirconDescriptor(const Eige
     return transformed_descriptor;
 }
 
-CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float>> &src_image, std::vector<std::vector<float>>&tar_image,
-    int with_nurbs)
+void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float>> &src_image,
+    std::vector<std::vector<float>>&tar_image,  int with_nurbs)
 {
     float current_epsilon = INFINITY;
-    CirconCorrespondence::Measure mes;
+    
     PointNormalType init_point = cid_source.GetRotationAXisPoint();
-    // take basic descriptor into a temp. array
-    std::vector<std::vector<float>>current_array_of_data = src_image;
-    std::vector<std::vector<float>>new_image;
-    std::map<int, size_t>image_point_index_map_current;
-    std::vector<std::vector<_dV>>desc_content_current;
     int prev_point_idx = -1;
     float init_ratio_nv = 0.0;
     float tow_nv = 0.9;
     int max_cell_index = 0;
     std::vector< CirconCorrespondence::Measure>similarity_structure_list;
-    std::map<int, size_t>image_point_index_map = cid_source.GetImagePointMap();
     int non_valid_count = 0;
     std::vector<PointNormalType>previous_pts_list;
     int current_row_idx = 0;
@@ -1321,7 +1330,7 @@ CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptor(const std:
 
     // calculate initial similarity value 
 
-    new_image = cid_source.GetDescriptorImage();
+   // new_image = cid_source.GetDescriptorImage();
     std::vector<std::vector<float>>init_max_shift_descriptor;
     int init_rot_idx = 0;
     std::map<int, size_t>init_mage_point_index_map = cid_source.GetImagePointMap();
@@ -1334,28 +1343,26 @@ CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptor(const std:
     {
         init_rot_idx = 2 * max_measure.rotation_index;
         std::cout << "start_rotation_index" << "@" << division_row << "=" << init_rot_idx << std::endl;
-        secondary_rot_idx = 2 * max_measure.rotation_index;
-        start_rotation_index = secondary_rot_idx;
+        start_rotation_index = 2 * max_measure.rotation_index;
+       //  = secondary_rot_idx;
     }
     // float sm = 0.0f;
-    float sm = ComputeMaximumRotationShiftParameter(new_image, tar_image, init_max_shift_descriptor, init_mage_point_index_map, descriptor_source, init_rot_idx,
+    float sm = ComputeMaximumRotationShiftParameter(cid_source.GetDescriptorImage(), tar_image,
+        init_max_shift_descriptor, init_mage_point_index_map, descriptor_source, init_rot_idx,
         init_cell_idx);
-
+   // CirconCorrespondence::Measure mes;
     // initialize similarity measure
-    mes.similarity_value = sm;
-    mes.cell_index = init_cell_idx;//itr.first;
-    mes.cell_values = init_max_shift_descriptor;
-    mes.rotation_index = init_rot_idx;
-    image_point_index_map_current = init_mage_point_index_map;
-    mes.img_pt_index_map = image_point_index_map_current;
-    mes.point_of_interest = cid_source.GetRotationAXisPoint();
-    mes.point_index = cid_source.GetBasicPointIndex();
-    mes.WlTransform = cid_source.GetTransformation();
-    mes.primary_idx = mes.cell_index % this->division_col;
-    new_image = init_max_shift_descriptor;
-    image_point_index_map = init_mage_point_index_map;
-    mes.similarity_value = sm;
-    mes.descriptor_content = descriptor_source;
+    // reset the previous max simialrity measure only after initial assignment
+    max_measure.Reset();
+    max_measure.similarity_value = sm;
+    max_measure.cell_index = init_cell_idx;//itr.first;
+  //  mes.cell_values = init_max_shift_descriptor;
+    max_measure.point_of_interest = cid_source.GetRotationAXisPoint();
+    max_measure.point_index = cid_source.GetBasicPointIndex();
+    max_measure.WlTransform = cid_source.GetTransformation();
+    max_measure.primary_idx = max_measure.cell_index % this->division_col;
+   // image_point_index_map = init_mage_point_index_map; 
+    max_measure.descriptor_content = descriptor_source;
    // previous_pts_list.push_back(mes.point_of_interest);
     int shortened_division_row;
     if (false)//division_row >= 256 || high_flag
@@ -1368,93 +1375,102 @@ CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptor(const std:
     {*/
         int count = 0;
         std::vector<size_t>temp_non_valid;
-        CirconImageDescriptor transformed_source;
+       // CirconImageDescriptor transformed_source; // put inside for loop 
         auto start = std::chrono::high_resolution_clock::now();
         std::vector <CirconCorrespondence::Measure>similarity_measure;
         similarity_measure.resize(shortened_division_row * division_col);
-//#pragma omp parallel for
+ #pragma omp parallel for
         for (int lin_idx = 0; lin_idx < shortened_division_row * division_col; lin_idx++)
         {
-            /*for (int row_idx = 0; row_idx < shortened_division_row; row_idx++)
-            {
-                for (int col_idx = 0; col_idx < nr_search_col; col_idx++)
-                {*/
-            int row_idx = lin_idx / division_col;
-            int col_idx = lin_idx % division_col;
-            if (col_idx > nr_search_col)
-                continue;
-            auto itr = init_descriptor_source[row_idx][col_idx];
-            if (itr.col_idx < 0 || itr.row_idx < 0)
-                continue;
+       /* for (int row_idx = 0; row_idx < shortened_division_row; row_idx++)
+        {
+            for (int col_idx = 0; col_idx < nr_search_col; col_idx++)
+            {*/
 
-            Eigen::Vector3d point_normal = itr.pt.tail<3>();
-            float dp = (point_normal.cast<float>()).dot(Eigen::Vector3f(0.0, 1.0, 0.0));
-            if (dp == -1.0f)
-            {
-                std::cout << itr.pt.head<3>() << std::endl;
-                continue;
+              int row_idx = lin_idx / division_col;
+              int col_idx = lin_idx % division_col;
+              if (col_idx > nr_search_col)
+                  continue;
+              auto itr = init_descriptor_source[row_idx][col_idx];
+              if (itr.col_idx < 0 || itr.row_idx < 0)
+                  continue;
+              //  int lin_idx = row_idx * division_col + col_idx;
 
-            }
-            else if (dp == 1.0f)
-            {
-                std::cout << itr.pt.head<3>() << std::endl;
-                continue;
-            }
+              int secondary_rot_idx;
+              if (division_row > 32)
+                  secondary_rot_idx = start_rotation_index;
 
-            else
-            {
-                // transformed_source.SetFlagForHighResolution(high_flag);
-                transformed_source = TransformCirconDescriptor(itr.pt); //itr
-               // transformed_source = TransformCirconDescriptor(itr.pt_idx);
-                new_image = transformed_source.GetDescriptorImage();
+                CirconImageDescriptor transformed_source;
+                std::vector<std::vector<float>>new_secondary_image;//init_max_shift_descriptor;
+             
+                Eigen::Vector3f point_normal = itr.pt.getNormalVector3fMap()/*tail<3>()*/;
+                float dp = (point_normal.cast<float>()).dot(Eigen::Vector3f(0.0, 1.0, 0.0));
+                if (dp == -1.0f)
+                {
+                    std::cout << itr.pt.getNormalVector3fMap() << std::endl;
+                    continue;
 
-            }
+                }
+                else if (dp == 1.0f)
+                {
+                    std::cout << itr.pt.getNormalVector3fMap() << std::endl;
+                    continue;
+                }
 
-            std::vector<std::vector<float>>secondary_max_shift_descriptor;
+                else
+                {
+                    // transformed_source.SetFlagForHighResolution(high_flag);
+                    transformed_source = TransformCirconDescriptor(itr.pt); //itr
+                  // transformed_source = TransformCirconDescriptor(itr.pt_idx);
+                    new_secondary_image = transformed_source.GetDescriptorImage();
 
-            std::map<int, size_t>secondary_mage_point_index_map = transformed_source.GetImagePointMap();
-            int second_cell_idx = transformed_source.GetDescriptorCellIndexForInterestPoint();
-            // check the similarity measure between new descriptor and the target image descriptor and return the similarity with max possible rotation   
-            std::vector<std::vector<_dV>>desc_content = transformed_source.GetDescriptorContent(); // TODO Use the update version
+                }
 
-            float updated_sm = ComputeMaximumRotationShiftParameter(new_image, tar_image, secondary_max_shift_descriptor,
-                secondary_mage_point_index_map, desc_content, secondary_rot_idx, second_cell_idx); //secondary_rot_idx
+                std::vector<std::vector<float>>secondary_max_shift_image;
 
-            if (true)//updated_sm >= sm
-            {
-                sm = updated_sm;
-                mes.similarity_value = sm;
-                // mes.cell_index = itr.row_idx * division_col + itr.col_idx;// itr.first;//
-                mes.cell_values = secondary_max_shift_descriptor;
+                std::map<int, size_t>secondary_mage_point_index_map = transformed_source.GetImagePointMap();
+                int second_cell_idx = transformed_source.GetDescriptorCellIndexForInterestPoint();
+                // check the similarity measure between new descriptor and the target image descriptor and return the similarity with max possible rotation   
+                std::vector<std::vector<_dV>>desc_content = transformed_source.GetDescriptorContent(); // TODO Use the update version
 
-                mes.rotation_index = secondary_rot_idx;  //  transformed_source.GetRotationIndex()
-               /* Eigen::Matrix4f inv_lW = transformed_source.GetTransformation().inverse();*/
-                mes.point_of_interest = transformed_source.GetRotationAXisPoint();
-                // image_point_index_map_current = std::move(secondary_mage_point_index_map);
-                mes.point_index = itr.pt_idx; // FindElementInMap(itr, image_point_index_map); //transformed_source.GetPointIndexFromCloud(itr);
-                mes.WlTransform = transformed_source.GetTransformation();
-                // mes.img_pt_index_map = image_point_index_map_current;
-                mes.primary_idx = itr.row_idx * division_col + itr.col_idx;
-                // mes.pix_value = current_array_of_data[itr.first];
-                desc_content_current = /*std::move*/(desc_content);
-                mes.descriptor_content = desc_content_current;
+                float updated_sm = ComputeMaximumRotationShiftParameter(new_secondary_image, tar_image, secondary_max_shift_image,
+                    secondary_mage_point_index_map, desc_content, secondary_rot_idx, second_cell_idx);
 
-            }
-             similarity_measure[lin_idx] = mes;
-             //else
-             //{
-             //    non_valid_count++;
-             //    // invalid_pt_list.push_back(itr.second);
-             //     // size_t _idx = transformed_source.GetPointIndexFromCloud(itr);
-             //     // temp_non_valid.push_back(curr_point_idx);
-             //   // count++;
-             //    continue;
-             //}
-            if (division_row > 32)
-                secondary_rot_idx = start_rotation_index;
-            count++;
-            /*      }
-              }*/
+                if (true)//updated_sm >= sm
+                {
+                    // sm = updated_sm;
+                    similarity_measure[lin_idx].similarity_value = updated_sm;
+                    // mes.cell_index = itr.row_idx * division_col + itr.col_idx;// itr.first;//
+                   // similarity_measure[lin_idx].cell_values = secondary_max_shift_image;
+
+                    similarity_measure[lin_idx].rotation_index = secondary_rot_idx;  //  transformed_source.GetRotationIndex()
+                   /* Eigen::Matrix4f inv_lW = transformed_source.GetTransformation().inverse();*/
+                    similarity_measure[lin_idx].point_of_interest = transformed_source.GetRotationAXisPoint();
+                    // image_point_index_map_current = std::move(secondary_mage_point_index_map);
+                    similarity_measure[lin_idx].point_index = itr.pt_idx; // FindElementInMap(itr, image_point_index_map); //transformed_source.GetPointIndexFromCloud(itr);
+                    similarity_measure[lin_idx].WlTransform = transformed_source.GetTransformation();
+                    // mes.img_pt_index_map = image_point_index_map_current;
+                    similarity_measure[lin_idx].primary_idx = itr.row_idx * division_col + itr.col_idx;
+                    // mes.pix_value = current_array_of_data[itr.first];
+                  //  desc_content_current = /*std::move*/(desc_content);
+                    similarity_measure[lin_idx].descriptor_content = std::move(desc_content);
+
+                }
+                // similarity_measure[lin_idx] = mes;
+                 //else
+                 //{
+                 //    non_valid_count++;
+                 //    // invalid_pt_list.push_back(itr.second);
+                 //     // size_t _idx = transformed_source.GetPointIndexFromCloud(itr);
+                 //     // temp_non_valid.push_back(curr_point_idx);
+                 //   // count++;
+                 //    continue;
+                 //}
+
+                count++;
+                /*      }
+                  }*/
+           // }
         }
         auto end = std::chrono::high_resolution_clock::now();
         double execute = std::chrono::duration_cast<
@@ -1487,10 +1503,23 @@ CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptor(const std:
     //    }
 
     //}
-        mes = FindMaximumSimilarityInIterations(similarity_measure);
-        max_measure = mes;  // keeps a copy of present measure as a member variable
+        auto startopto = std::chrono::high_resolution_clock::now();
+        if (similarity_measure.size() > 0)
+        {
+            size_t idx = FindMaximumSimilarityInIterations(similarity_measure);
+            max_measure = similarity_measure[idx];
+        }
+        auto endopto = std::chrono::high_resolution_clock::now();
+        double executeopto = std::chrono::duration_cast<
+            std::chrono::duration<double, std::milli>>(endopto - startopto).count();
+        executeopto = executeopto / double(1000);
+        std::cout << " assignment time:" << executeopto << std::endl;
+       
+       // max_measure = mes;  // keeps a copy of present measure as a member variable
+      
         std::cout << "max_rotation_index" << "@" << division_row << "=" << max_measure.rotation_index << std::endl;
-        return mes;
+        similarity_measures_content = std::move(similarity_measure);
+    /*  return max_measure;*/
 }
 
 CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptorWithSimilarityMeasure(const std::vector<std::vector<float>> &src_image, 
@@ -1535,10 +1564,10 @@ CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptorWithSimilar
         init_rot_idx,init_cell_idx);
 
     mes.cell_index = init_cell_idx;//itr.first;
-    mes.cell_values = init_max_shift_descriptor;
+  //  mes.cell_values = init_max_shift_descriptor;
     mes.rotation_index = init_rot_idx;
     image_point_index_map_current = init_mage_point_index_map;
-    mes.img_pt_index_map = image_point_index_map_current;
+  //  mes.img_pt_index_map = image_point_index_map_current;
     mes.point_of_interest = cid_source.GetRotationAXisPoint();
     mes.point_index = cid_source.GetBasicPointIndex();
     mes.WlTransform = cid_source.GetTransformation();
@@ -1608,14 +1637,14 @@ CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptorWithSimilar
                     sm = updated_sm;
                     mes.similarity_value = sm;
                     mes.cell_index = second_cell_idx;// itr.first;//
-                    mes.cell_values = secondary_max_shift_descriptor;
+                   // mes.cell_values = secondary_max_shift_descriptor;
 
                     mes.rotation_index = secondary_rot_idx;  //  transformed_source.GetRotationIndex()
                     mes.point_of_interest = transformed_source.GetRotationAXisPoint();
                     image_point_index_map_current = std::move(secondary_mage_point_index_map);
                     mes.point_index = itr.second; // FindElementInMap(itr, image_point_index_map); //transformed_source.GetPointIndexFromCloud(itr);
                     mes.WlTransform = transformed_source.GetTransformation();
-                    mes.img_pt_index_map = image_point_index_map_current;
+                  //  mes.img_pt_index_map = image_point_index_map_current;
                     mes.primary_idx = itr.first%division_col;
                    // mes.pix_value = current_array_of_data[itr.first];
 
@@ -1641,14 +1670,15 @@ CirconCorrespondence::Measure CirconCorrespondence::CompareDescriptorWithSimilar
         pt_validity_ratio.insert(std::pair<float, size_t>(non_valid_ratio,curr_point_idx));*/
         // update descriptor data for next comparison
 
-        current_array_of_data = mes.cell_values;
+      //  current_array_of_data = mes.cell_values;
         PointNormalType current_point = mes.point_of_interest;
         previous_pts_list.push_back(init_point);
         float dist = DistanceBetweenPoints(previous_pts_list, current_point);// pcl::geometry::distance(init_point, current_point);
         similarity_structure_list.push_back(mes);
         if (dist <= Epsilon)
         {
-            mes = FindMaximumSimilarityInIterations(similarity_structure_list);
+            size_t idx = FindMaximumSimilarityInIterations(similarity_structure_list);
+            mes = similarity_structure_list[idx];
             break;
         }
         else
@@ -2325,7 +2355,8 @@ std::vector<float>CirconCorrespondence::RotateImageByIndexNumber(const Eigen::Ma
 }
 
 float CirconCorrespondence::ReScaleAndEvaluateDescriptorForMaximumRotation(const std::vector<std::vector<float>>& src_descriptor,
-    const std::vector<std::vector<float>>& target_descriptor, int &rotation_idx, std::vector<std::vector<float>> &max_descriptor,int min_res)
+    const std::vector<std::vector<float>>& target_descriptor, 
+    int &rotation_idx, std::vector<std::vector<float>> &max_descriptor,int min_res)
 {
 
     auto startItr = std::chrono::high_resolution_clock::now();
@@ -2682,12 +2713,14 @@ float CirconCorrespondence::ReScaleAndEvaluateDescriptorForMaximumRotation(const
 //    return sm;
 //}
 float CirconCorrespondence::ComputeMaximumRotationShiftParameter(const std::vector<std::vector<float>> &secondary_descriptor,
-    const std::vector<std::vector<float>> &target_point_descriptor, std::vector<std::vector<float>> &max_shift_descriptor, std::map<int, size_t>&image_point_index_map_current,
-    std::vector<std::vector<_dV>> &descriptor_content, int &rotation_idx, int& secondary_dsc_posn)
+    const std::vector<std::vector<float>> &target_point_descriptor, std::vector<std::vector<float>> &max_shift_descriptor,
+    std::map<int, size_t>&image_point_index_map_current,std::vector<std::vector<_dV>> &descriptor_content,
+    int &rotation_idx, int& secondary_dsc_posn)
 {
     // first rescale source and target descriptors to coarser level starting 8x8
   
-   float max_similarity = ReScaleAndEvaluateDescriptorForMaximumRotation(secondary_descriptor, target_point_descriptor, rotation_idx, max_shift_descriptor);
+   float max_similarity = ReScaleAndEvaluateDescriptorForMaximumRotation(secondary_descriptor, target_point_descriptor,
+       rotation_idx, max_shift_descriptor);
 
    int up_row_idx = secondary_dsc_posn / division_col;
    int up_col_idx = secondary_dsc_posn %division_col;

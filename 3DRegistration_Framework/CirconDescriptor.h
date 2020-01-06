@@ -15,9 +15,9 @@ struct descriptor_Value
     int pt_idx;
     float val_at_pixel;
     Eigen::Vector2d st;
-    Eigen::VectorXd pt;
+    PointNormalType pt;
     descriptor_Value(): row_idx(-1), col_idx(-1), pix_idx(-1), pt_idx(-1), val_at_pixel(-INFINITY), st(-1,-1) {};
-    descriptor_Value(int r, int c, int pix, int pt, int val, Eigen::Vector2d st_, Eigen::VectorXd pt_) :
+    descriptor_Value(int r, int c, int pix, int pt, int val, Eigen::Vector2d st_, PointNormalType pt_) :
         row_idx(r), col_idx(c), pix_idx(pix), pt_idx(pt), val_at_pixel(val), st(st_),
         pt(pt_)
     {}
@@ -151,14 +151,14 @@ public:
     float GetRadiusFromCloud();  // useful for computing radial resolution
     void SetMaximumRadius(float rad);
     std::vector<std::vector<_dV>> GetDescriptorContent();
-    void CreateSecondaryDescriptor(const Eigen::VectorXd &pt, const cParameterGrid & pGrid);
+    void CreateSecondaryDescriptor(const PointNormalType /*Eigen::VectorXd*/ &pt, const cParameterGrid & pGrid);
     std::unique_ptr<ON_NurbsSurface> GetNurbsSurface();
     std::unique_ptr<ON_NurbsCurve> GetNurbsCurve();
     void SetNurbsSurfaceAndCurve(const ON_NurbsSurface &nbs);
    // nb_surface(inputCloud);
     static Eigen::Matrix4f ConstructLocalCoordinateAxes(CirconImageDescriptor &cid, PointNormalType &axis_point);
     void SetLocalFrame(const Eigen::Matrix4f &l_frame);
-    void UpdateDeescriptor(const Eigen::VectorXd &pt);
+    void UpdateDeescriptor(const PointNormalType /*Eigen::VectorXd*/ &pt);
     void SetMaxSearchColumn(int max_value);
     void SetBoundingBoxInformation(const surface::CloudBoundingBox &box);
     Eigen::Vector2d TransformAndScaleParametricCoordinate(const Eigen::Vector2d & vec2d, const double &w, const double &h);

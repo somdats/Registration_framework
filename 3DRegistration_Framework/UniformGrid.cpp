@@ -198,7 +198,7 @@ cParameterGrid::cParameterGrid(double grid_size, PtAccessor &&pointAccessor,
     : grid_size(grid_size), pointAccess(std::move(pointAccessor))
 {
     if (buildImmediatly)
-        build();
+        buildgrid();
 }
 cParameterGrid& cParameterGrid:: operator=(const cParameterGrid & _grid)
 {
@@ -224,7 +224,7 @@ cParameterGrid ::~cParameterGrid()
 {
 
 }
-void cParameterGrid::build(void)
+void cParameterGrid::buildgrid(void)
 {
     // Check if already built
     if (!grid.empty())

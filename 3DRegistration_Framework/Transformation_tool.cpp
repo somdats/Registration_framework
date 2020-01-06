@@ -738,6 +738,7 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
       float x_diff, y_diff, ya, yb;
       int offset = 0;
       int  index, x, y;
+      std::vector<std::vector<float>> ImageValues(ImgData);
       for (int i = 0; i < row_new; i++)
       {
           for (int j = 0; j < col_new; j++)
@@ -752,7 +753,7 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
               {
                   for (int y_itr = y; y_itr < y + (int)(y_ratio); y_itr++) //y_ratio
                   {
-                      float val = ImgData[x_itr][y_itr];
+                      float val = ImageValues[x_itr][y_itr];
                       if (val != -INFINITY)
                       {
                           accumulate += val;
