@@ -17,6 +17,14 @@ namespace
         return lhs.similarity_value < rhs.similarity_value;
     }
    
+    size_t ToreduceIndex( const size_t &curr_value ,const size_t &input_min,
+        const size_t &input_max, const size_t &op_min, const size_t &op_max)
+    {
+        float input_range = input_max - input_min;
+        float output_range = op_max - op_min;
+        size_t opValue = (curr_value - input_min) * output_range / input_range ;
+        return opValue;
+    }
     Eigen::Vector3f project(Eigen::Vector3f origin, Eigen::Vector3f normal, Eigen::Vector3f point)
     {
         // Bring the point to the origin
@@ -185,21 +193,20 @@ namespace
     size_t FindMaximumSimilarityInIterations(const std::vector <CirconCorrespondence::Measure>& m)
     {
 
-      //  auto max_it = std::max_element(m.begin(), m.end(), cmp);
-
+      /*  auto max_it = std::max_element(m.begin(), m.end(), cmp);
+        size_t idx_count = max_it - m.begin();*/
         auto it = m.begin();
         float value = it++->similarity_value;
-        CirconCorrespondence::Measure max_similarity;
+      //  CirconCorrespondence::Measure max_similarity;
         size_t idx_count = 0;
-        for (;it !=m.end(); it++)
+        for (; it != m.end(); it++)
         {
-            if (it->similarity_value > 0)
+            if (it->similarity_value == -1.0)
+                continue;
+            if (it->similarity_value > value)
             {
-                if (it->similarity_value > value)
-                {
-                    value = it->similarity_value;
-                    idx_count = it - m.begin();
-                }
+                value = it->similarity_value;
+                idx_count = it - m.begin();
             }
         }
      
@@ -600,7 +607,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
             while (level_itr != num_resolution)
             {
                 // prepare source descriptor
-                cid_target.SetBasicPointIndex(source_basic_index);
+                cid_source.SetBasicPointIndex(source_basic_index);
                /* if (level_itr == num_resolution - 1)
                 {
                     up_resolution_count *= 2;
@@ -1296,10 +1303,10 @@ CirconImageDescriptor CirconCorrespondence::TransformCirconDescriptor(const Poin
     CirconImageDescriptor transformed_descriptor = cid_source;
     transformed_descriptor.SetBasicPointIndex(-1);
     transformed_descriptor.SetMaximumRadius(maximum_radius);
-    PointNormalType rotpoint = pt;
+   // PointNormalType rotpoint = pt;
    /* rotpoint.getVector3fMap() = pt.head<3>().cast<float>();
     rotpoint.getNormalVector3fMap() = pt.tail<3>().cast<float>();*/
-    transformed_descriptor.SetRotationAxisPoint(rotpoint);
+    transformed_descriptor.SetRotationAxisPoint(pt);
     transformed_descriptor.ConstructLocalFrameOfReference();
  /*  auto grid = cid_source.GetParameterGrid();
     transformed_descriptor.setParametergrid(*grid);*/
@@ -1378,9 +1385,11 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
        // CirconImageDescriptor transformed_source; // put inside for loop 
         auto start = std::chrono::high_resolution_clock::now();
         std::vector <CirconCorrespondence::Measure>similarity_measure;
-        similarity_measure.resize(shortened_division_row * division_col);
- #pragma omp parallel for
-        for (int lin_idx = 0; lin_idx < shortened_division_row * division_col; lin_idx++)
+        similarity_measure.resize(shortened_division_row * division_col,Measure());
+       // std::cout << "I am here:" << std::endl;
+       int reduced_lIdx = 0;
+ #pragma omp parallel for schedule(dynamic, 1)
+       for (int lin_idx = 0; lin_idx < shortened_division_row * division_col; lin_idx++)
         {
        /* for (int row_idx = 0; row_idx < shortened_division_row; row_idx++)
         {
@@ -1394,8 +1403,10 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
               auto itr = init_descriptor_source[row_idx][col_idx];
               if (itr.col_idx < 0 || itr.row_idx < 0)
                   continue;
-              //  int lin_idx = row_idx * division_col + col_idx;
-
+              /*size_t reduced_lIdx = ToreduceIndex(lin_idx, 0, shortened_division_row * division_col, 0,
+                  shortened_division_row * nr_search_col);*/
+            /*  = row_idx * nr_search_col + col_idx;*/
+           // std::cout <<  "reduced idx:" << reduced_lIdx << std::endl;
               int secondary_rot_idx;
               if (division_row > 32)
                   secondary_rot_idx = start_rotation_index;
@@ -1454,6 +1465,9 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
                     // mes.pix_value = current_array_of_data[itr.first];
                   //  desc_content_current = /*std::move*/(desc_content);
                     similarity_measure[lin_idx].descriptor_content = std::move(desc_content);
+                  //  count++;
+
+             //  reduced_lIdx+= 1;
 
                 }
                 // similarity_measure[lin_idx] = mes;
@@ -1466,8 +1480,8 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
                  //   // count++;
                  //    continue;
                  //}
-
-                count++;
+              //  reduced_lIdx++;
+               // count++;
                 /*      }
                   }*/
            // }
@@ -1503,22 +1517,32 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
     //    }
 
     //}
-        auto startopto = std::chrono::high_resolution_clock::now();
+        
         if (similarity_measure.size() > 0)
         {
+            std::cout << "similarity_measure size:" << similarity_measure.size() << std::endl;
+            auto startopto = std::chrono::high_resolution_clock::now();
             size_t idx = FindMaximumSimilarityInIterations(similarity_measure);
+            auto endopto = std::chrono::high_resolution_clock::now();
+            double executeopto = std::chrono::duration_cast<
+                std::chrono::duration<double, std::milli>>(endopto - startopto).count();
+            executeopto = executeopto / double(1000);
+            std::cout << " assignment time:" << executeopto << std::endl;
             max_measure = similarity_measure[idx];
         }
-        auto endopto = std::chrono::high_resolution_clock::now();
-        double executeopto = std::chrono::duration_cast<
-            std::chrono::duration<double, std::milli>>(endopto - startopto).count();
-        executeopto = executeopto / double(1000);
-        std::cout << " assignment time:" << executeopto << std::endl;
-       
+ 
        // max_measure = mes;  // keeps a copy of present measure as a member variable
       
         std::cout << "max_rotation_index" << "@" << division_row << "=" << max_measure.rotation_index << std::endl;
+        auto startmove = std::chrono::high_resolution_clock::now();
         similarity_measures_content = std::move(similarity_measure);
+        auto endmove = std::chrono::high_resolution_clock::now();
+        double executemove = std::chrono::duration_cast<
+            std::chrono::duration<double, std::milli>>(endmove - startmove).count();
+        executemove = executemove / double(1000);
+        std::cout << " move time:" << executemove << std::endl;
+       
+ 
     /*  return max_measure;*/
 }
 

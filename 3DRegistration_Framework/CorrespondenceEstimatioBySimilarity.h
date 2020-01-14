@@ -58,9 +58,28 @@ public:
         {
             similarity_value = -1.0;
         }
+
+        Measure( const Measure& m): similarity_value(m.similarity_value), cell_index(m.cell_index),
+            rotation_index(m.rotation_index),
+            point_of_interest(m.point_of_interest), point_index(m.point_index), WlTransform(m.WlTransform),
+            primary_idx(m.primary_idx), pix_value(m.pix_value), descriptor_content(m.descriptor_content)
+        {
+          //  std::cout << "Copy Constructor of Measure called:" << std::endl;
+        }
+
+        Measure( Measure&& m) : similarity_value(m.similarity_value), cell_index(m.cell_index),
+            rotation_index(m.rotation_index),
+            point_of_interest(m.point_of_interest), point_index(m.point_index), WlTransform(m.WlTransform),
+            primary_idx(m.primary_idx), pix_value(m.pix_value), descriptor_content(m.descriptor_content)
+        {
+            std::cout << "Move Constructor of Measure called:" << std::endl;
+        }
+
+     
         ~Measure()
         {
           //  auto startopto = std::chrono::high_resolution_clock::now();
+          //  std::cout << "destructor of measure called:" << std::endl;
             descriptor_content.clear();
             descriptor_content.shrink_to_fit();
            /* auto endopto = std::chrono::high_resolution_clock::now();
@@ -83,24 +102,42 @@ public:
            // img_pt_index_map = M.img_pt_index_map;
             primary_idx = M.primary_idx;
             pix_value = M.pix_value;
-            descriptor_content = M.descriptor_content;
+            descriptor_content.assign(M.descriptor_content.begin(), M.descriptor_content.end());// = M.descriptor_content;
+            std::cout << "assignment operator of Measure called:" << std::endl;
             return *this;
         }
-        Measure(const Measure &M)
-        {
-          
-            similarity_value = M.similarity_value;
-            cell_index = M.cell_index;
-            rotation_index = M.rotation_index;
-           // cell_values = M.cell_values;
-            point_of_interest = M.point_of_interest;
-            point_index = M.point_index;
-            WlTransform = M.WlTransform;
-          //  img_pt_index_map = M.img_pt_index_map;
-            primary_idx = M.primary_idx;
-            pix_value = M.pix_value;
-            descriptor_content = M.descriptor_content;
+        //Measure(const Measure &M)
+        //{
+        //  
+        //    similarity_value = M.similarity_value;
+        //    cell_index = M.cell_index;
+        //    rotation_index = M.rotation_index;
+        //   // cell_values = M.cell_values;
+        //    point_of_interest = M.point_of_interest;
+        //    point_index = M.point_index;
+        //    WlTransform = M.WlTransform;
+        //  //  img_pt_index_map = M.img_pt_index_map;
+        //    primary_idx = M.primary_idx;
+        //    pix_value = M.pix_value;
+        //    descriptor_content = M.descriptor_content;
 
+        //}
+
+        Measure& operator=(Measure &&M)
+        {
+            assert(this != &M);
+            similarity_value = std::move(M.similarity_value);
+            cell_index = std::move(M.cell_index);
+            rotation_index = std::move(M.rotation_index);
+            // cell_values = M.cell_values;
+            point_of_interest = std::move(M.point_of_interest);
+            point_index = std::move(M.point_index);
+            WlTransform = std::move(M.WlTransform);
+            // img_pt_index_map = M.img_pt_index_map;
+            primary_idx = std::move(M.primary_idx);
+            pix_value = std::move(M.pix_value);
+            descriptor_content = std::move(M.descriptor_content);
+            return *this;
         }
        void Reset()
         {
@@ -112,7 +149,7 @@ public:
            //  img_pt_index_map = M.img_pt_index_map;
            primary_idx =-1;
            pix_value = -1.0;
-           descriptor_content.shrink_to_fit();
+          // descriptor_content.shrink_to_fit();
          }
     };
     typedef PointData<float> PointDataType;

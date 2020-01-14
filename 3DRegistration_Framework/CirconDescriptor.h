@@ -21,18 +21,38 @@ struct descriptor_Value
         row_idx(r), col_idx(c), pix_idx(pix), pt_idx(pt), val_at_pixel(val), st(st_),
         pt(pt_)
     {}
-  
-    descriptor_Value(const descriptor_Value& temp)
+    descriptor_Value(descriptor_Value&& temp) :
+        row_idx(temp.row_idx), col_idx(temp.col_idx), pix_idx(temp.pix_idx), pt_idx(temp.pt_idx), val_at_pixel(temp.val_at_pixel),
+        st(temp.st),pt(temp.pt)
     {
-        row_idx = temp.row_idx;
-        col_idx = temp.col_idx;
-        pix_idx = temp.pix_idx;
-        pt_idx = temp.pt_idx;
-        val_at_pixel = temp.val_at_pixel;
-        st = temp.st;
-        pt = temp.pt;
-    
+        std::cout << "Move Constructor of descriptor_Value called:" << std::endl;
+
     }
+    descriptor_Value(const descriptor_Value& temp) :
+        row_idx(temp.row_idx), col_idx(temp.col_idx), pix_idx(temp.pix_idx), pt_idx(temp.pt_idx), val_at_pixel(temp.val_at_pixel),
+        st(temp.st), pt(temp.pt)
+    {
+      //  std::cout << "Copy Constructor of descriptor_Value called:" << std::endl;
+
+    }
+
+    //~descriptor_Value()
+    //{
+    //  //  std::cout << "destructor of descriptor_Value called:" << std::endl;
+    //}
+
+    //descriptor_Value(const descriptor_Value& temp)
+    //{
+    //    row_idx = temp.row_idx;
+    //    col_idx = temp.col_idx;
+    //    pix_idx = temp.pix_idx;
+    //    pt_idx = temp.pt_idx;
+    //    val_at_pixel = temp.val_at_pixel;
+    //    st = temp.st;
+    //    pt = temp.pt;
+    //
+    //}
+   
     descriptor_Value& operator =(const descriptor_Value &temp)
     {
         if (this == &temp)
@@ -44,6 +64,22 @@ struct descriptor_Value
         val_at_pixel = temp.val_at_pixel;
         st = temp.st;
         pt = temp.pt;
+        std::cout << "assignment operator of descriptor_Value called:" << std::endl;
+
+        return *this;
+    }
+
+    descriptor_Value& operator =( descriptor_Value &&temp)
+    {
+        if (this == &temp)
+            return *this;
+        row_idx = std::move(temp.row_idx);
+        col_idx = std::move(temp.col_idx);
+        pix_idx = std::move(temp.pix_idx);
+        pt_idx = std::move(temp.pt_idx);
+        val_at_pixel = std::move(temp.val_at_pixel);
+        st = std::move(temp.st);
+        pt = std::move(temp.pt);
         return *this;
     }
   

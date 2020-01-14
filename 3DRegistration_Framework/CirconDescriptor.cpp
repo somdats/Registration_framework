@@ -151,8 +151,13 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
    // Eigen::Vector3f test1(0.0, 0.0, 0.0);
     float max_radius;
     _dV dv;
+    _dV dv1;
+    std::vector<_dV>temp;
+    temp.resize(num_division_col, dv1);
+  //  std::cout << "after col copy constructor" << std::endl;
     std::vector<std::vector<_dV>>temp_descriptor_content;
-    temp_descriptor_content.resize(num_division_row, std::vector<_dV>(num_division_col, dv));
+    temp_descriptor_content.resize(num_division_row, temp);
+   // temp_descriptor_content.resize(num_division_row, std::vector<_dV>(num_division_col, dv));
   /*  descriptor_content.clear();
     descriptor_content.shrink_to_fit();
    
@@ -209,10 +214,10 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
                     Eigen::Vector2d optim_parameter;
                     if (true ) // col_reduced
                     {
-                       
+                        auto start = std::chrono::high_resolution_clock::now();
                         double error = surface::cNurbsSurface::ComputeOptimizedParameterSpaceValue(r_it, 1e-5, 
                             optim_parameter, false);
-                        auto start = std::chrono::high_resolution_clock::now();
+                       
                       //  bool inside = surface::TrimInputSurfaceUsingCurveBoundary(optim_parameter, *nb_surface_tfs, 
                        //     nb_curve, a0, a1, scale);
                         bool inside = _pGrid.query(optim_parameter);
@@ -220,7 +225,8 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
                         double trim_time = std::chrono::duration_cast<
                             std::chrono::duration<double, std::milli>>(end - start).count();
                         trim_time = trim_time / double(1000);
-                     //   std::cout << " optimization time per cell:" << trim_time << std::endl;
+                        /*if (trim_time >= 0.001)
+                            std::cout << " optimization time per cell:" << trim_time << std::endl;*/
                         Eigen::Vector3d vec3[3];
                         if (inside)
                         {
@@ -258,8 +264,9 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
                                 if (true)
                                     Image2D.addCellAt(i, j, num_division_col, val);
                                 int linearized_cell_index = i * num_division_col + j;
-                                temp_descriptor_content[i][j] = _dV(i, j, linearized_cell_index, pt_idx,
+                                _dV data(i, j, linearized_cell_index, pt_idx,
                                     val, optim_parameter, pt_dash/*.cast<double>()*/);
+                                temp_descriptor_content[i][j] = std::move(data);
                                 total_eval_time += executeopto;
                                 total_trim_time += trim_time;
                         
@@ -1193,7 +1200,7 @@ void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Ei
     sigma_threshold = rad_resolution / 16.0;  // set up threshold for non valid pts
 
 
-    auto startItr = std::chrono::high_resolution_clock::now();
+   
     CloudWithoutType transformed_cloud = TransformPointToLocalFrame();
 
     CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
@@ -1235,15 +1242,16 @@ void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Ei
    // Set2DUniformGrid(pTarget);
     // float max_radius = GetRadiusFromCloud();// ComputeMaximumRadius(transformed_cloud);
    // std::shared_ptr<cParameterGrid> cParam = GetParameterGrid();
+   
+    SetImageDescriptorResolution(2.0 *M_PI, max_radius, height);
+    Image2D.clearMatrix();
+    auto startItr = std::chrono::high_resolution_clock::now();
+    ComputeFeature(cGrid2D, pGrid);
     auto finishItr = std::chrono::high_resolution_clock::now();
     double executeTime = std::chrono::duration_cast<
         std::chrono::duration<double, std::milli>>(finishItr - startItr).count();
     executeTime = executeTime / double(1000);
-    //  std::cout << "Time consumed current:" << executeTime << "sec" << std::endl;
-    SetImageDescriptorResolution(2.0 *M_PI, max_radius, height);
-    Image2D.clearMatrix();
-
-    ComputeFeature(cGrid2D, pGrid);
+   // std::cout << "Time consumed for secondary descriptor:" << executeTime << "sec" << std::endl;
 
     rot_matrix = WorldLocalTransformation.block<3, 3>(0, 0);
 
