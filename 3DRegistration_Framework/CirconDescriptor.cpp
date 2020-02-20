@@ -150,7 +150,7 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
    // int i = 0;
    // Eigen::Vector3f test1(0.0, 0.0, 0.0);
     float max_radius;
-    _dV dv;
+   // _dV dv;
     _dV dv1;
     std::vector<_dV>temp;
     temp.resize(num_division_col, dv1);

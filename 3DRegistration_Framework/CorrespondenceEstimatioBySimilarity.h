@@ -59,21 +59,25 @@ public:
             similarity_value = -1.0;
         }
 
-        Measure( const Measure& m): similarity_value(m.similarity_value), cell_index(m.cell_index),
+        Measure(const Measure& m) : similarity_value(m.similarity_value), cell_index(m.cell_index),
             rotation_index(m.rotation_index),
             point_of_interest(m.point_of_interest), point_index(m.point_index), WlTransform(m.WlTransform),
             primary_idx(m.primary_idx), pix_value(m.pix_value), descriptor_content(m.descriptor_content)
         {
-          //  std::cout << "Copy Constructor of Measure called:" << std::endl;
+            //  std::cout << "Copy Constructor of Measure called:" << std::endl;
         }
 
-        Measure( Measure&& m) : similarity_value(m.similarity_value), cell_index(m.cell_index),
-            rotation_index(m.rotation_index),
-            point_of_interest(m.point_of_interest), point_index(m.point_index), WlTransform(m.WlTransform),
-            primary_idx(m.primary_idx), pix_value(m.pix_value), descriptor_content(m.descriptor_content)
+        Measure( Measure&& M): similarity_value(std::move(M.similarity_value)), cell_index(std::move(M.cell_index)),
+            rotation_index(std::move(M.rotation_index)),
+            point_of_interest(std::move(M.point_of_interest)), point_index(std::move(M.point_index)), 
+            WlTransform(std::move(M.WlTransform)),
+            primary_idx(std::move(M.primary_idx)), pix_value(std::move(M.pix_value)), 
+            descriptor_content(std::move(M.descriptor_content))
         {
             std::cout << "Move Constructor of Measure called:" << std::endl;
+          
         }
+
 
      
         ~Measure()
@@ -137,6 +141,7 @@ public:
             primary_idx = std::move(M.primary_idx);
             pix_value = std::move(M.pix_value);
             descriptor_content = std::move(M.descriptor_content);
+            std::cout << "Move assignment of Measure called:" << std::endl;
             return *this;
         }
        void Reset()
@@ -203,6 +208,9 @@ int &rotation_idx, int &secondary_dsc_posn);
  CloudPtr Construct2DCloudForKdtreeSearch(const CloudWithNormalPtr &inputCloud, const Eigen::Matrix4f &WorldLocalTransformation);
  std::pair<int, float>  ComputeRotationIndex(const std::vector<std::vector<float>> &src_desc,  std::vector<std::vector<float>> &tar_desc,
      int row, int col);
+
+ static void ComputeFeaturePoints(const CloudWithoutType &inputCloud, const ON_NurbsSurface &nb_surface,
+     const double &radius, std::string OutputFileName);
    
 
 

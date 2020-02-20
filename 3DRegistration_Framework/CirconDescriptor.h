@@ -22,8 +22,9 @@ struct descriptor_Value
         pt(pt_)
     {}
     descriptor_Value(descriptor_Value&& temp) :
-        row_idx(temp.row_idx), col_idx(temp.col_idx), pix_idx(temp.pix_idx), pt_idx(temp.pt_idx), val_at_pixel(temp.val_at_pixel),
-        st(temp.st),pt(temp.pt)
+        row_idx(std::move(temp.row_idx)), col_idx(std::move(temp.col_idx)), pix_idx(std::move(temp.pix_idx)),
+        pt_idx(std::move(temp.pt_idx)), val_at_pixel(std::move(temp.val_at_pixel)),
+        st(std::move(temp.st)),pt(std::move(temp.pt))
     {
         std::cout << "Move Constructor of descriptor_Value called:" << std::endl;
 
