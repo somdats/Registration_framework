@@ -137,6 +137,18 @@ REG3D_API Eigen::Vector3f EIGEN_NORMAL_CAST(const type1 &point);
 template< typename type1>
  bool isPointFinite(const type1 &point);
 
+ struct cElement
+ {
+     float similarity_value;
+     int tgt_idx;
+     int src_idx;
+     cElement(float sim, int sIdx, int tIdx) : similarity_value(sim), src_idx(sIdx), tgt_idx(tIdx)
+     {
+
+     }
+     cElement() :similarity_value(-1.0), src_idx(-1), tgt_idx(-1) {}
+ };
+ typedef struct cElement cEle;
  
   //  template <typename poinT>
   //   void copypoint(PointData<float> &sourcepoint, poinT &targetpoint)

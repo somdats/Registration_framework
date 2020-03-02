@@ -13,6 +13,7 @@
 #include"Common.h"
 #include<pcl/kdtree/kdtree_flann.h>
 #include"NurbsSurface.h"
+#include"Datatypes.h"
 #define FULL_ANGLE 2 *M_PI
 class REG3D_API CirconCorrespondence : public CorrespondenceEstimator::ICorrespondenceEstimator
 {
@@ -40,6 +41,7 @@ public:
     {
         pcl::fromPCLPointCloud2(*sourceCloud, *original_src_cloud_with_normal);
     }
+
    
     struct Measure
     {
@@ -157,6 +159,8 @@ public:
           // descriptor_content.shrink_to_fit();
          }
     };
+
+    
     typedef PointData<float> PointDataType;
     void PrepareDataForCorrespondenceEstimation(CloudWithoutType &srcCloud, CloudWithoutType &tarCloud);
     search::ISearch* getSearchStrategy()const;
@@ -211,6 +215,11 @@ int &rotation_idx, int &secondary_dsc_posn);
 
  static void ComputeFeaturePoints(const CloudWithoutType &inputCloud, const ON_NurbsSurface &nb_surface,
      const double &radius, std::string OutputFileName);
+  void prepareDescriptorForInterestPoint(CirconImageDescriptor& cid, const cParameterGrid &pGrid, PointNormalType rotpoint,
+     const bool &use_nurbs_strategy = true);
+ std::vector<cEle> SortFeaturePointsOnSimilarityValue(const CloudWithNormalPtr &inputSrcCloud,
+     const CloudWithNormalPtr &inputTgtCloud, CirconImageDescriptor &cid_src, CirconImageDescriptor &cid_tgt, 
+     const float &max_averg_dist);
    
 
 

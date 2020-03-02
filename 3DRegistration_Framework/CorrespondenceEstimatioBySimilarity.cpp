@@ -1,5 +1,4 @@
 #include"pch.h"
-#include"CorrespondenceEstimatioBySimilarity.h"
 #include"ErrorMetric.h"
 #include"Voronoi_diagram.h"
 #include"wfuncs.h"
@@ -9,9 +8,14 @@
 #include<algorithm>
 #include"UniformGrid.h"
 
-
+#include"CorrespondenceEstimatioBySimilarity.h"
 namespace
 {
+    bool SortFunction(const cEle &a, const cEle &b)
+    {
+         return a.similarity_value > b.similarity_value;
+    }
+        
     bool cmp(const CirconCorrespondence::Measure& lhs, const CirconCorrespondence::Measure& rhs)
     {
         return lhs.similarity_value < rhs.similarity_value;
@@ -435,6 +439,42 @@ surface::CloudBoundingBox CirconCorrespondence::initNurbsPCABoundingBox(int orde
      }
      return Cloud2D;
  }
+
+ std::vector<cEle> CirconCorrespondence::SortFeaturePointsOnSimilarityValue(const CloudWithNormalPtr &inputSrcCloud,
+     const CloudWithNormalPtr &inputTgtCloud, CirconImageDescriptor &cid_src, CirconImageDescriptor &cid_tgt,
+     const float &max_averg_dist)
+ {
+     
+     std::vector<cEle> idx_similarity_pair;
+     idx_similarity_pair.reserve(inputTgtCloud->points.size() *inputSrcCloud->points.size());
+     bool use_nurbs_strategy = true;
+     cid_src.SetMaximumAverageDistance(max_averg_dist);
+     cid_tgt.SetMaximumAverageDistance(max_averg_dist);
+
+     for (int iTgt = 0; iTgt < inputTgtCloud->points.size(); iTgt++)
+     {
+         PointNormalType tar_corres = inputTgtCloud->at(iTgt);
+         int  target_basic_index = original_target_index[iTgt];
+         cid_tgt.SetBasicPointIndex(target_basic_index);
+         PrepareDescriptor(cid_tgt, tar_corres, use_nurbs_strategy, false);
+         std::vector<std::vector<float>> target_descriptor_image = cid_tgt.GetDescriptorImage();
+         for (int iSrc = 0; iSrc < inputSrcCloud->points.size(); iSrc++)
+         {
+             PointNormalType src_corres = inputSrcCloud->at(iSrc);
+             int  src_basic_index = original_source_index[iSrc];
+             cid_src.SetBasicPointIndex(src_basic_index);
+             PrepareDescriptor(cid_src, src_corres, use_nurbs_strategy, true);
+             std::vector<std::vector<float>> src_descriptor_image = cid_src.GetDescriptorImage();
+             float similarity_score = ComputeMeasureOfSimilarity(target_descriptor_image, src_descriptor_image);
+             if (similarity_score != -INF)
+                 idx_similarity_pair.emplace_back(cEle{ similarity_score, iSrc, iTgt }); //src_basic_index, target_basic_index
+
+         }
+     }
+     std::sort(idx_similarity_pair.begin(), idx_similarity_pair.end(), SortFunction);
+     return idx_similarity_pair;
+    
+ }
 Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 {
     CloudWithNormalPtr corrs_source(new pcl::PointCloud<PointNormalType>);
@@ -530,9 +570,22 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
     );
    // cid_target.setParametergrid(cParam_tar);
     cParam_target = cParam_tar;
-    for (tIndex = 0; tIndex < original_target_index.size(); tIndex++)
+
+    // addition of new interestpoint detection method//
+    // create feature descriptor at coarse resolution////////////////////
+    CirconImageDescriptor cid_src_feature(input_source, 16, 16, 512, src_cloud_parameter, *nbs_src, *ncs_src);
+    CirconImageDescriptor cid_tgt_feature(input_target, 16, 16, 512, tgt_cloud_parameter, *nbs, *ncs);
+    // descriptor initialization ends///////////////////
+  
+    /* Build descriptor and sort the interest points pair in decreasing order of similarity          */
+   std::vector<cEle>corres_pair = SortFeaturePointsOnSimilarityValue(corrs_source, corrs_target, cid_src_feature, 
+       cid_tgt_feature, avg_dist);
+   for (auto pair : corres_pair)
+    //for (tIndex = 0; tIndex < original_target_index.size(); tIndex++)
+
     {
-      
+       tIndex = pair.tgt_idx;
+       sIndex = pair.src_idx;
         // find closet point on nurb surface for a give pt. of interest
         tar_corres = corrs_target->at(tIndex);
        // tar_corres = tgx->points[original_target_index[tIndex]];
@@ -562,8 +615,8 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
           local_tfs_target.cast<double>());
       cid_target.SetNurbsSurfaceAndCurve(*nb_surface_tfs);*/
        
-        for (sIndex = 0; sIndex < original_source_index.size(); sIndex++)  //16 -20 for oilpump
-        {
+        //for (sIndex = 0; sIndex < original_source_index.size(); sIndex++)  //16 -20 for oilpump
+        //{
           
             // find closet point on nurb surface for a give pt. of interest
     
@@ -860,7 +913,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 
             }
 
-        }
+      //  }
 
 
     }
@@ -1140,6 +1193,80 @@ std::pair<float, float> CirconCorrespondence::ComputeStoppingCriteria(std::vecto
    
 }
 
+void CirconCorrespondence::prepareDescriptorForInterestPoint(CirconImageDescriptor& cid, const cParameterGrid &pGrid, 
+    PointNormalType rotpoint,const bool &use_nurbs_strategy)
+{
+    
+    cid.SetRotationAxisPoint(rotpoint);
+    cid.ConstructLocalFrameOfReference();
+
+
+    auto startItr = std::chrono::high_resolution_clock::now();
+    CloudWithoutType transformed_cloud = cid.TransformPointToLocalFrame();
+    /////////////////////
+
+    CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
+    pcl::fromPCLPointCloud2(*transformed_cloud, *pTarget);
+    float height = cid.ComputeheightFromPointCloud(pTarget);
+
+    cid.SetMaxSearchColumn(nr_search_col);
+    float max_radius = maximum_radius;
+    cid.SetImageDescriptorResolution(FULL_ANGLE, max_radius, height);
+
+    if (use_nurbs_strategy)
+    {
+        CUniformGrid2D cGrid2D(cid.GetAverageDist(),
+            /* point accessor */
+            [&pTarget](Eigen::Vector2d *out_pnt, double *out_attrib, size_t idx) -> bool
+        {
+            if (idx < pTarget->points.size())
+            {
+                Eigen::Vector2d vec(pTarget->points[idx].x, pTarget->points[idx].y);
+                *out_pnt = vec;
+                *out_attrib = pTarget->points[idx].z;
+                return true;
+            }
+            else
+                return false;
+        }
+        );
+        // parameter grid to decide on the optim parameter
+        auto start = std::chrono::high_resolution_clock::now();
+
+        auto end = std::chrono::high_resolution_clock::now();
+        double execute = std::chrono::duration_cast<
+            std::chrono::duration<double, std::milli>>(end - start).count();
+        execute = execute / double(1000);
+        //  std::cout << " parameter execution time:" << execute << std::endl;
+
+
+        auto startopto = std::chrono::high_resolution_clock::now();
+
+        cid.ComputeFeature(cGrid2D, pGrid);
+      
+        auto endopto = std::chrono::high_resolution_clock::now();
+        double executeopto = std::chrono::duration_cast<
+            std::chrono::duration<double, std::milli>>(endopto - startopto).count();
+        executeopto = executeopto / double(1000);
+        std::cout << " Descriptor time:" << executeopto << std::endl;
+
+    }
+    else
+    {
+        auto startopto = std::chrono::high_resolution_clock::now();
+        cid.ComputeFeature(1);
+        auto endopto = std::chrono::high_resolution_clock::now();
+        double executeopto = std::chrono::duration_cast<
+            std::chrono::duration<double, std::milli>>(endopto - startopto).count();
+        executeopto = executeopto / double(1000);
+        std::cout << " Descriptor time:" << executeopto << std::endl;
+    }
+    float theta = cid.GetRotationAngle();
+    int num_rows_shift = std::round((theta * division_row) / (2 * M_PI));  //number of rows to shift
+    cid.SetRotationIndex(num_rows_shift);
+
+    // Epsilon = max_radius / (float(division_col * 16));  // currently no. of row steps  = no.of col steps ( square image)
+}
 void CirconCorrespondence ::PrepareDescriptor(CirconImageDescriptor& cid, PointNormalType rotpoint, 
     const bool &use_nurbs_strategy, const bool &cloud_type)
 {
@@ -1873,7 +2000,7 @@ void CirconCorrespondence::SetResolutionOfDescriptor(CirconImageDescriptor &dsc,
      pcl::fromPCLPointCloud2(*inputCloud, *_cloud);
      CloudWithNormalPtr cloudxyz(new pcl::PointCloud <PointNormalType>);
      CloudWithNormalPtr _filteredcloud(new pcl::PointCloud <PointNormalType>);
-     pcl::UniformSampling<PointNormalType>uni_sampling;
+     pcl::UniformSampling<PointNormalType>uni_sampling/*(true)*/;
      uni_sampling.setInputCloud(_cloud);
      uni_sampling.setRadiusSearch(radius);
      uni_sampling.filter(*cloudxyz);
@@ -1896,6 +2023,8 @@ void CirconCorrespondence::SetResolutionOfDescriptor(CirconImageDescriptor &dsc,
        kt.nearestKSearch(cloudxyz->points[itr], 1, indxs, dist);
        _filteredcloud->points.push_back(_cloud->points[indxs[0]]);
        fprintf(pFile, "%d\n", indxs[0]);
+      /* _filteredcloud->points.push_back(cloudxyz->points[itr]);
+       fprintf(pFile, "%d\n", ptIndx.indices[itr]);*/
    }
    fclose(pFile);
    _filteredcloud->width = cloudxyz->points.size();
