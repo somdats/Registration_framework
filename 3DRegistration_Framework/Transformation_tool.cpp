@@ -451,7 +451,7 @@ CloudWithoutType tool ::TransFormationOfCloud(CloudWithoutType inputCloud, Eigen
   // Computes the orientedBoundingBox from a cloud
   // i/p: pointcloud
   // o/p minimum point3d, maximumpoint3d,  length (diagonal) of BoundingBox
-  float tool::ComputeOrientedBoundingBoxOfCloud(CloudWithNormalPtr cloud, Eigen::Vector3f &min_pt, Eigen::Vector3f &max_pt)
+  float tool::ComputeOrientedBoundingBoxOfCloud(const CloudWithNormalPtr &cloud, Eigen::Vector3f &min_pt, Eigen::Vector3f &max_pt)
   {
       // compute principal direction
       Eigen::Vector4f centroid;

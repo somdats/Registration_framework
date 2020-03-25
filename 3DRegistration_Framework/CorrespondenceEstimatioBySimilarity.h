@@ -14,6 +14,7 @@
 #include<pcl/kdtree/kdtree_flann.h>
 #include"NurbsSurface.h"
 #include"Datatypes.h"
+#include"UniformGrid.h"
 #define FULL_ANGLE 2 *M_PI
 class REG3D_API CirconCorrespondence : public CorrespondenceEstimator::ICorrespondenceEstimator
 {
@@ -37,9 +38,11 @@ public:
         _write(write_data),
         src_cloud_parameter(src_st),
         tgt_cloud_parameter(tgt_st),
+        original_tgt_cloud_with_normal(new pcl::PointCloud <PointNormalType>),
         original_src_cloud_with_normal(new pcl::PointCloud <PointNormalType>)
     {
         pcl::fromPCLPointCloud2(*sourceCloud, *original_src_cloud_with_normal);
+        pcl::fromPCLPointCloud2(*targetCloud, *original_tgt_cloud_with_normal);
     }
 
    
@@ -108,7 +111,7 @@ public:
            // img_pt_index_map = M.img_pt_index_map;
             primary_idx = M.primary_idx;
             pix_value = M.pix_value;
-            descriptor_content.assign(M.descriptor_content.begin(), M.descriptor_content.end());// = M.descriptor_content;
+            descriptor_content = M.descriptor_content;// = M.descriptor_content;
             std::cout << "assignment operator of Measure called:" << std::endl;
             return *this;
         }
@@ -131,7 +134,10 @@ public:
 
         Measure& operator=(Measure &&M)
         {
-            assert(this != &M);
+            if (this == &M)
+                return *this;
+            // free the existing resource
+            descriptor_content.shrink_to_fit();
             similarity_value = std::move(M.similarity_value);
             cell_index = std::move(M.cell_index);
             rotation_index = std::move(M.rotation_index);
@@ -143,6 +149,15 @@ public:
             primary_idx = std::move(M.primary_idx);
             pix_value = std::move(M.pix_value);
             descriptor_content = std::move(M.descriptor_content);
+
+            M.similarity_value = -1;
+            M.cell_index = -1;
+            M.point_of_interest = PointNormalType({ 0.0,0.0,0.0,0.0,0.0,0.0 });
+            M.rotation_index = -1;
+            M.point_index = -1;
+            M.WlTransform = Eigen::Matrix4f::Identity();
+            M.primary_idx = -1;
+            M.pix_value = -1;
             std::cout << "Move assignment of Measure called:" << std::endl;
             return *this;
         }
@@ -220,6 +235,7 @@ int &rotation_idx, int &secondary_dsc_posn);
  std::vector<cEle> SortFeaturePointsOnSimilarityValue(const CloudWithNormalPtr &inputSrcCloud,
      const CloudWithNormalPtr &inputTgtCloud, CirconImageDescriptor &cid_src, CirconImageDescriptor &cid_tgt, 
      const float &max_averg_dist);
+ static void SampleDataUniformly(const CloudWithoutType &pc, const float &gSize, const std::string &OutPutFileName);
    
 
 
@@ -254,6 +270,7 @@ protected:
     int nr_search_col;
     std::vector<int>non_valid_index;
     CloudWithNormalPtr original_src_cloud_with_normal;
+    CloudWithNormalPtr original_tgt_cloud_with_normal;
     float maximum_radius;
     CloudPtr cloud_with_2d_points;
     bool high_flag = false;

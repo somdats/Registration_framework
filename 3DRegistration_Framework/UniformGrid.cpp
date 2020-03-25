@@ -251,3 +251,103 @@ bool cParameterGrid::query(const Vec2 &query)const
     else
         return false;
 }
+////////////////////////////////////////////////////////
+CUniformGrid3D::CUniformGrid3D(double grid_size, PointAccessor &&pointAccessor,
+    bool buildImmediatly)
+    : grid_size(grid_size), pointAccess(std::move(pointAccessor))
+{
+    if (buildImmediatly)
+        build();
+}
+
+CUniformGrid3D::~CUniformGrid3D()
+{}
+
+CUniformGrid3D& CUniformGrid3D:: operator=(const CUniformGrid3D & _grid)
+{
+    if (this == &_grid)
+        return *this;
+    grid_size = _grid.grid_size;
+    grid = _grid.grid;
+    pointAccess = _grid.pointAccess;
+    return *this;
+
+}
+
+CUniformGrid3D::CUniformGrid3D(const CUniformGrid3D & _grid)
+{
+    grid = _grid.grid;
+    grid_size = _grid.grid_size;
+    pointAccess = _grid.pointAccess;
+}
+
+void CUniformGrid3D::build(void)
+{
+    // Check if already built
+    if (!grid.empty())
+        return;
+
+    // Request all points from client, one by one
+    double attrib_dummy; Vec3 point;
+    for (unsigned i = 0; pointAccess(&point,/* &attrib_dummy,*/ i); i++)
+    {
+        // Quantized position of the point
+        SCell cell = SCell::get(point, grid_size);
+        // Insert into grid
+        grid.insert(cell);
+    }
+}
+
+std::vector<Eigen::Vector3f> CUniformGrid3D::Compute()
+{
+    std::vector<Eigen::Vector3f>voxel_centers;
+    float half_value = 0.5;
+    for (std::unordered_set<SCell, SCell::hash>::iterator itr = grid.begin(); itr != grid.end(); ++itr )
+    {
+        SCell cell = *itr;
+        std::cout << cell.x << "," << cell.y << "," << cell.z << std::endl;
+        float x = (float)(itr->x)* grid_size + half_value * grid_size;
+        float y = (float)(itr->y)* grid_size + half_value * grid_size;
+        float z = (float)(itr->z)* grid_size + half_value * grid_size;
+        /*long y = itr->y * static_cast<long>(grid_size) + half_value * static_cast<long>(grid_size);
+        long z = itr->z * static_cast<long>(grid_size) + half_value * static_cast<long>(grid_size);*/
+        Eigen::Vector3f cell_center(x,y,z); /*(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z))*/;
+        std::cout << cell_center << std::endl;
+        voxel_centers.push_back(cell_center);
+    }
+    return  voxel_centers;
+}
+
+void  CUniformGrid3D::GetSampledCloud(const CloudWithoutType &InputCloud,
+    const std::vector<Eigen::Vector3f> &voxel_center, const std::string &OutPutFileName)
+{
+    CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
+    pcl::fromPCLPointCloud2(*InputCloud, *pTarget);
+    pcl::KdTreeFLANN<PointNormalType>kt;
+    kt.setInputCloud(pTarget);  // initialize kdtree with uniformly sampled cloud points
+    std::vector<int>indxs;
+    std::vector<float>dist;
+    
+    size_t posSlash = OutPutFileName.rfind('.');
+    std::string subfileName = OutPutFileName.substr(0, posSlash);
+    subfileName = subfileName + ".txt";
+    FILE *pFile;
+    pFile = fopen(subfileName.c_str(), "wb");
+
+    CloudWithNormalPtr _filteredcloud(new pcl::PointCloud <PointNormalType>);
+    _filteredcloud->points.reserve(voxel_center.size());
+
+    for (const auto pt : voxel_center)
+    {
+        PointNormalType qPt;
+        qPt.getVector3fMap() = pt;
+        kt.nearestKSearch(qPt, 1, indxs, dist);
+        _filteredcloud->points.emplace_back(pTarget->points[indxs[0]]);
+        fprintf(pFile, "%d\n", indxs[0]);
+    }
+    fclose(pFile);
+    _filteredcloud->width = voxel_center.size();
+    _filteredcloud->height = 1;
+
+    pcl::io::savePLYFile(OutPutFileName, *_filteredcloud);
+}

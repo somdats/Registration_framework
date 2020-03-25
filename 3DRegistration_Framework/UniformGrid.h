@@ -12,10 +12,11 @@
 #include <vector>
 #include <unordered_map>
 #include <limits>
+#include <unordered_set>
 #include"Config.h"
 // Eigen library
 #include <Eigen/Dense>
-
+#include"Datatypes.h"
 
 
 //////
@@ -283,5 +284,124 @@ public:
     bool query(const Vec2 &query
     ) const;
 
+};
+
+class REG3D_API CUniformGrid3D
+{
+public:
+
+    ////
+    // Types
+    //kdtree
+    typedef pcl::KdTreeFLANN<PointType>KdTreeType;
+
+    /** @brief 2D vector type. */
+    typedef Eigen::Vector3d Vec3;
+
+    /** @brief Point accessor type */
+    typedef std::function<bool(Vec3*/*, double**/, size_t)> PointAccessor;
+
+    /** @brief Grid cell functionality wrapper. */
+    struct SCell
+    {
+        struct hash
+        {
+            size_t operator() (const SCell& key_value) const
+            {
+                // Uses the 3d vector hash function described in "Optimized Spatial
+                // Hashing for Collision Detection of Deformable Objects" available here:
+                // http://www.beosil.com/download/CollisionDetectionHashing_VMV03.pdf
+                // We're discarding the z-value because this is a 2D-grid, which might
+                // make the hashing function perform a bit less optimal for large point
+                // clouds
+                return size_t(
+                    key_value.x * 73856093L ^ key_value.y * 19349663L ^ key_value.z * 83492791L
+                    /* mod N is ommitted since it would be (size_t)-1 here, which is
+                    basically a no-op */
+                );
+            }
+        };
+
+        long x, y,z;
+
+        inline bool operator == (const SCell &other) const
+        {
+            return x == other.x && y == other.y && z == other.z;
+        }
+
+        inline static SCell get(const Vec3 &position, double gridsize)
+        {
+            bool nx = position.x()<0, ny = position.y()<0, nz = position.z()< 0;
+            return{ (long)(position.x() / gridsize) - long(nx),
+                (long)(position.y() / gridsize) - long(ny),
+                (long)(position.z() / gridsize) - long(nz) };
+        }
+    };
+
+
+protected:
+
+    ////
+    // Data members
+
+    /** @brief Point accessor. */
+    PointAccessor pointAccess;
+
+    /**
+    * @brief
+    *		Sparse grid organizing the @link #points points @endlink for fast
+    *		neighborhood query, implemented as a hash map.
+    */
+    std::unordered_set<SCell, SCell::hash> grid;
+
+    /** @brief Grid cell edge length of the @link #grid grid @endlink . */
+    double grid_size;
+// kdtree for nearest point query on the 3d voxel grid 
+    KdTreeType Kdtree;
+
+
+public:
+
+    ////
+    // Object construction / deconstruction
+
+    /**
+    * @brief
+    *		Construct with given cell edge length and point accessor. If
+    *		@a buildImmediatly is set to @c false, the method @ref #build must be called
+    *		before the grid can be queried.
+    */
+    CUniformGrid3D(double grid_size, PointAccessor &&pointAccessor,
+        bool buildImmediatly = true);
+
+    /** @brief The destructor. */
+    ~CUniformGrid3D();
+
+    /* assignment operator*/
+    CUniformGrid3D& operator=(const CUniformGrid3D &grid);
+
+    // copy constructor
+    CUniformGrid3D(const CUniformGrid3D &grid);
+
+    ////
+    // Methods
+
+    /**
+    * @brief
+    *		Populates the grid with the data points provided by the @ref #PointAccessor .
+    *		Does not do anything if the grid was already built by the constructor.
+    */
+    void build(void);
+
+    /**
+    * @brief
+    *   uniformly sample a point cloud and return the sub-sampled cloud
+    *	
+    */
+    std::vector<Eigen::Vector3f> Compute();
+
+
+    static void GetSampledCloud(const CloudWithoutType &InputCloud,
+        const std::vector<Eigen::Vector3f> &voxel_center, const std::string &OutPutFileName);
 };
 #endif // ifndef __UNIFORM_GRID_H__

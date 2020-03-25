@@ -7,22 +7,30 @@
 #include <chrono>
 #include"UniformGrid.h"
 
+enum cellSate
+{
+    INVALID = 0,
+    VALID
+};
 struct descriptor_Value
 {
-    int row_idx;
-    int col_idx;
+   
+    cellSate state;
+    //int row_idx;
+    //int col_idx;
     int pix_idx;
     int pt_idx;
     float val_at_pixel;
     Eigen::Vector2d st;
     PointNormalType pt;
-    descriptor_Value(): row_idx(-1), col_idx(-1), pix_idx(-1), pt_idx(-1), val_at_pixel(-INFINITY), st(-1,-1) {};
-    descriptor_Value(int r, int c, int pix, int pt, int val, Eigen::Vector2d st_, PointNormalType pt_) :
-        row_idx(r), col_idx(c), pix_idx(pix), pt_idx(pt), val_at_pixel(val), st(st_),
+    descriptor_Value(): state(cellSate::INVALID), pix_idx(-1), pt_idx(-1), val_at_pixel(-INFINITY), st(-1,-1) {};
+    descriptor_Value(/*int r, int c,*/ cellSate cState, int pix, int pt, int val, Eigen::Vector2d st_, PointNormalType pt_) :
+        /*row_idx(r), col_idx(c)*/ state(cState), pix_idx(pix), pt_idx(pt), val_at_pixel(val), st(st_),
         pt(pt_)
     {}
     descriptor_Value(descriptor_Value&& temp) :
-        row_idx(std::move(temp.row_idx)), col_idx(std::move(temp.col_idx)), pix_idx(std::move(temp.pix_idx)),
+       /* row_idx(std::move(temp.row_idx)), col_idx(std::move(temp.col_idx))*/state (temp.state),
+        pix_idx(std::move(temp.pix_idx)),
         pt_idx(std::move(temp.pt_idx)), val_at_pixel(std::move(temp.val_at_pixel)),
         st(std::move(temp.st)),pt(std::move(temp.pt))
     {
@@ -30,7 +38,8 @@ struct descriptor_Value
 
     }
     descriptor_Value(const descriptor_Value& temp) :
-        row_idx(temp.row_idx), col_idx(temp.col_idx), pix_idx(temp.pix_idx), pt_idx(temp.pt_idx), val_at_pixel(temp.val_at_pixel),
+       /* row_idx(temp.row_idx), col_idx(temp.col_idx)*/state(temp.state), pix_idx(temp.pix_idx), pt_idx(temp.pt_idx),
+        val_at_pixel(temp.val_at_pixel),
         st(temp.st), pt(temp.pt)
     {
       //  std::cout << "Copy Constructor of descriptor_Value called:" << std::endl;
@@ -58,8 +67,9 @@ struct descriptor_Value
     {
         if (this == &temp)
             return *this;
-        row_idx = temp.row_idx;
-        col_idx = temp.col_idx;
+        state = temp.state;
+        /*row_idx = temp.row_idx;
+        col_idx = temp.col_idx;*/
         pix_idx = temp.pix_idx;
         pt_idx = temp.pt_idx;
         val_at_pixel = temp.val_at_pixel;
@@ -74,20 +84,31 @@ struct descriptor_Value
     {
         if (this == &temp)
             return *this;
-        row_idx = std::move(temp.row_idx);
-        col_idx = std::move(temp.col_idx);
+        /*row_idx = std::move(temp.row_idx);
+        col_idx = std::move(temp.col_idx);*/
+        state = temp.state;
         pix_idx = std::move(temp.pix_idx);
         pt_idx = std::move(temp.pt_idx);
         val_at_pixel = std::move(temp.val_at_pixel);
         st = std::move(temp.st);
         pt = std::move(temp.pt);
+
+        temp.state = INVALID;
+       /* temp.row_idx = -1;
+        temp.col_idx = -1;*/
+        temp.pix_idx = -1;
+        temp.pt_idx = -1;
+        temp.val_at_pixel = -INFINITY;
+        temp.st = Eigen::Vector2d({ -1, -1 });
+       // temp.pt = std::move(temp.pt);
+
         return *this;
     }
   
-    bool operator<(const descriptor_Value& a)
+   /* bool operator<(const descriptor_Value& a)
     {
         return col_idx < a.col_idx;
-    }
+    }*/
 
 };
 typedef struct descriptor_Value _dV;

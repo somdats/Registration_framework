@@ -136,7 +136,9 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
        
     }
     int col_reduced;
-    if (true)
+    if (num_division_row < 32)
+        col_reduced = 16; //32
+    else
         col_reduced = 32;
     /*else
         col_reduced = 64;*/
@@ -264,7 +266,8 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
                                 if (true)
                                     Image2D.addCellAt(i, j, num_division_col, val);
                                 int linearized_cell_index = i * num_division_col + j;
-                                _dV data(i, j, linearized_cell_index, pt_idx,
+                               
+                                _dV data(/*i, j,*/cellSate::VALID, linearized_cell_index, pt_idx,
                                     val, optim_parameter, pt_dash/*.cast<double>()*/);
                                 temp_descriptor_content[i][j] = std::move(data);
                                 total_eval_time += executeopto;
@@ -608,7 +611,9 @@ void CirconImageDescriptor::ComputeFeature(int i)
 
                       /*  pt.head<3>() = original_cloud_with_normal->points[itr].getVector3fMap().cast<double>();
                         pt.tail<3>() = original_cloud_with_normal->points[itr].getNormalVector3fMap().cast<double>();*/
-                        descriptor_content[row_index][col_index] = _dV(row_index, col_index, curr_position, itr, c_ij_current, vec2d, pt);
+                        cellSate state_(INVALID);
+                        descriptor_content[row_index][col_index] = _dV(/*row_index, col_index,*/ state_,
+                            curr_position, itr, c_ij_current, vec2d, pt);
                         // i++;
                     }
  
@@ -991,6 +996,7 @@ void CirconImageDescriptor::ReconstructPointCloud()
    
     reconstructed_points.clear();
     reconstructed_points.shrink_to_fit();
+    reconstructed_points.reserve(num_division_row * num_division_col);
     int count = 0;
     for (int idx = 0; idx < num_division_row; idx++)
     {
@@ -1004,7 +1010,7 @@ void CirconImageDescriptor::ReconstructPointCloud()
                 float z_value = img_data[idx][icx] * height_resolution;
                 Eigen::Vector4f recon_pt(x_value, y_value, z_value, 1.0);
                 recon_pt = WorldLocalTransformation.inverse() * recon_pt;
-                reconstructed_points.push_back(recon_pt.head<3>());
+                reconstructed_points.emplace_back(recon_pt.head<3>());
                 /* Eigen::Vector3f recon_pt = mat.inverse() * Eigen::Vector3f(x_value, y_value, z_value)  + RotationAxisPoint.getVector3fMap();
                  reconstructed_points.push_back(Eigen::Vector3f(recon_pt));*/
                  // std::cout << count << "," << i_idx << "," << j_idx << std::endl;
@@ -1201,10 +1207,11 @@ void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Ei
 
 
    
-    CloudWithoutType transformed_cloud = TransformPointToLocalFrame();
+   // CloudWithoutType transformed_cloud = TransformPointToLocalFrame();
 
     CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
-    pcl::fromPCLPointCloud2(*transformed_cloud, *pTarget);
+  //  pcl::fromPCLPointCloud2(*transformed_cloud, *pTarget);
+    pcl::transformPointCloudWithNormals(*original_cloud_with_normal, *pTarget, WorldLocalTransformation);
     float height = ComputeheightFromPointCloud(pTarget);
     CUniformGrid2D cGrid2D( avgpoint_dist,
         /* point accessor */
@@ -1220,29 +1227,7 @@ void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Ei
         else
             return false;
     }
-        );  // 0.75 *
-    //        // parameter grid to decide on the optim parameter
-    //double gSize = 1.0 / 128;
-    //std::vector<Eigen::Vector2d> st_param = st_params;
-    //cParameterGrid cParam(gSize,
-    //    /* point accessor */
-    //    [&st_param](Eigen::Vector2d *out_pnt, double *out_attrib, size_t idx) -> bool
-    //{
-    //    if (idx < st_param.size())
-    //    {
-    //        Eigen::Vector2d vec(st_param[idx](0), st_param[idx](1));
-    //        *out_pnt = vec;
-    //        *out_attrib = 0.0;
-    //        return true;
-    //    }
-    //    else
-    //        return false;
-    //}
-    //);
-   // Set2DUniformGrid(pTarget);
-    // float max_radius = GetRadiusFromCloud();// ComputeMaximumRadius(transformed_cloud);
-   // std::shared_ptr<cParameterGrid> cParam = GetParameterGrid();
-   
+        ); 
     SetImageDescriptorResolution(2.0 *M_PI, max_radius, height);
     Image2D.clearMatrix();
     auto startItr = std::chrono::high_resolution_clock::now();
