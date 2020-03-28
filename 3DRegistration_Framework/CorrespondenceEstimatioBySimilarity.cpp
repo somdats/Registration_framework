@@ -313,17 +313,17 @@ namespace
         return out;
     }
 
-    std::vector<size_t> RejectCorrespondenceBasedOnSimilarityValue(const std::vector<CirconCorrespondence::Measure> 
+    std::vector<cEle> RejectCorrespondenceBasedOnSimilarityValue(const std::vector<cEle> 
         &SimilarityValues, const float &Sim_Max, const float &Sim_Min, const float &ThresholdMultiplier)
     {
         auto diff = Sim_Max - Sim_Min;
         auto cnt = 0;
-        std::vector<size_t>Idx;
+        std::vector<cEle>Idx;
         for (auto sim : SimilarityValues)
         {
             if (Sim_Max - sim.similarity_value <= ThresholdMultiplier * diff)
             {
-                Idx.emplace_back(cnt);
+                Idx.emplace_back(cEle(sim.similarity_value,sim.src_idx,sim.tgt_idx));
                 cnt++;
                
             }
@@ -598,7 +598,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
    std::vector<cEle>corres_pair = SortFeaturePointsOnSimilarityValue(corrs_source, corrs_target, cid_src_feature,
        cid_tgt_feature, avg_dist);
    int count_sim = 0;
-   std::vector<Measure>sim_values;
+   std::vector<cEle>sim_values;
    sim_values.reserve(6);
    float sim_max = -INF; float sim_min = INF;
    int min_idx, max_idx, MaxCorrespondencePair = 6;
@@ -606,25 +606,31 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
    bool update_measure = false;
    int max_tar_Index;
   
-   for (auto pair : corres_pair)
+   std::vector<cEle>batch_corres_pair = { corres_pair.begin(), corres_pair.begin() + 7};
+   std::vector<cEle>::iterator it = corres_pair.begin();
+   /*std::advance(it, 6);
+   batch_corres_pair.insert(batch_corres_pair.begin(), it, it + 7);*/
+   int iitr = 0;
+   for (; iitr < batch_corres_pair.size(); ++iitr)
    // for (tIndex = 40; tIndex < 45; tIndex++)//
 
     {
-       tIndex = pair.tgt_idx;
-       sIndex = pair.src_idx;
-       
-        tar_corres = corrs_target->at(tIndex);
-        target_basic_index = original_target_index[tIndex];
-        cid_target.SetBasicPointIndex(target_basic_index);
+       std::cout << "iitr:" << iitr << std::endl;
+       std::cout << batch_corres_pair[iitr].src_idx << "," << batch_corres_pair[iitr].tgt_idx << std::endl;
+       tIndex = batch_corres_pair[iitr].tgt_idx;
+       tar_corres = corrs_target->at(tIndex);
+       target_basic_index = original_target_index[tIndex];
+       cid_target.SetBasicPointIndex(target_basic_index);
         int start = 0;
         non_valid_index.clear();  //recently added
 
                //for (sIndex = 40; sIndex <45; sIndex++)  //16 -20 for oilpump  original_source_index.size()
         //{
           
-            // find closet point on nurb surface for a give pt. of interest
-    
+            // start point of interest
+           sIndex = batch_corres_pair[iitr].src_idx;
             src_corres = corrs_source->at(sIndex);
+            source_basic_index = original_source_index[sIndex];
            // src_corres = srx->points[original_source_index[sIndex]];
             //if (use_nurbs_strategy)
             //{
@@ -653,7 +659,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
             //}
             int incr_reslolution = 0;
             int level_itr = 0;
-            source_basic_index = original_source_index[sIndex];
+            
     
             
           /* for a correspondence pair, iterate over resolution to find the correct match ( high similarity) 
@@ -702,8 +708,10 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
              
                 if (count_sim < MaxCorrespondencePair && MaxCorrespondencePair > 1)
                 {
-                     //CompareDescriptorWithSimilarityMeasure
-                    sim_values.emplace_back(max_measure);
+                    sim_values.emplace_back(cEle(max_measure.similarity_value, batch_corres_pair[iitr].src_idx,
+                        batch_corres_pair[iitr].tgt_idx));
+
+                    // keep tracks which pair of source and target point gives max- similarity for every six pair of points
                     if (max_measure.similarity_value > sim_max)
                     {
                         sim_max = max_measure.similarity_value;
@@ -722,8 +730,9 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                     ++count_sim;
                     break;
                 }
-                std::vector<size_t> indices;
-                if (update_measure)
+                std::vector<cEle> indices;
+                // update to get the source pt and target pt with max similarity
+                if (update_measure )
                 {
                     max_measure = std::move(Max_Correspondence_Measure);
                     tar_corres = corrs_target->at(max_tar_Index);
@@ -739,6 +748,29 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                 sim_values.clear();
                 sim_values.shrink_to_fit();
                 MaxCorrespondencePair = indices.size() >= 1?indices.size() : 0;
+
+                /// current hack
+                if (MaxCorrespondencePair > 1)
+                {
+                    std::sort(indices.begin(), indices.end(), SortFunction);
+                    batch_corres_pair.erase(batch_corres_pair.begin(), batch_corres_pair.end());
+                    batch_corres_pair.insert(batch_corres_pair.begin(),indices.begin(), indices.end());
+                    iitr = -1;
+                    int num_row = cid_source.GetRowDivision() / std::pow(2, level_itr); //incr_reslolution
+                    int num_col = cid_source.GetColumnDivision() / std::pow(2, level_itr);  // may be changed num_row;
+                    int num_height = cid_source.GetHeightDivision();// / std::pow(2, incr_reslolution);
+                    nr_search_col = cid_source.GetRowDivision() / std::pow(2, level_itr);// cid_source.GetHeightDivision();
+                    SetResolutionOfDescriptor(cid_source, num_row, num_col, num_height);
+                    SetResolutionOfDescriptor(cid_target, num_row, num_col, num_height);
+                    cid_source.UpdateImageDimension(num_col, num_row);
+                    cid_target.UpdateImageDimension(num_col, num_row);
+                    this->division_col = num_col;
+                    this->division_row = num_row;
+                    source_basic_index = -1;
+                    reset = false;
+                    break;
+                }
+                ////////////////
 
             /* if (ms.similarity_value < tow_ms)
                 {
@@ -934,6 +966,17 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                     this->division_row = num_row;
                     source_basic_index = -1;
                     reset = false;
+                    /////////////////
+                    if (it!= corres_pair.end())
+                    {
+                        batch_corres_pair.erase(batch_corres_pair.begin(), batch_corres_pair.end());
+                        std::advance(it, 6);
+                        batch_corres_pair.insert(batch_corres_pair.begin(), it, it + 7);
+                        std::cout << batch_corres_pair[0].src_idx << batch_corres_pair[0].tgt_idx << std::endl;
+                        iitr = -1;
+                     
+                    }
+                    ////////////////
                     if (_write)
                     {
                         char subfile[100];
