@@ -305,14 +305,14 @@ std::vector<Eigen::Vector3f> CUniformGrid3D::Compute()
     for (std::unordered_set<SCell, SCell::hash>::iterator itr = grid.begin(); itr != grid.end(); ++itr )
     {
         SCell cell = *itr;
-        std::cout << cell.x << "," << cell.y << "," << cell.z << std::endl;
+       // std::cout << cell.x << "," << cell.y << "," << cell.z << std::endl;
         float x = (float)(itr->x)* grid_size + half_value * grid_size;
         float y = (float)(itr->y)* grid_size + half_value * grid_size;
         float z = (float)(itr->z)* grid_size + half_value * grid_size;
         /*long y = itr->y * static_cast<long>(grid_size) + half_value * static_cast<long>(grid_size);
         long z = itr->z * static_cast<long>(grid_size) + half_value * static_cast<long>(grid_size);*/
         Eigen::Vector3f cell_center(x,y,z); /*(static_cast<float>(x), static_cast<float>(y), static_cast<float>(z))*/;
-        std::cout << cell_center << std::endl;
+       // std::cout << cell_center << std::endl;
         voxel_centers.push_back(cell_center);
     }
     return  voxel_centers;

@@ -125,15 +125,15 @@ std::unique_ptr<cParameterGrid> CirconImageDescriptor::duplicate(std::unique_ptr
 //    }
 //
 //}
-void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const cParameterGrid &_pGrid)
+void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const cParameterGrid &_pGrid)
 {
-   
+
     if (false) //num_division_row >= 256 || high_res_flag
     {
         num_division_col = 32;
         num_division_row = 32;
         Image2D.SetImage(num_division_col, num_division_row);
-       
+
     }
     int col_reduced;
     if (num_division_row < 32)
@@ -142,38 +142,39 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
         col_reduced = 32;
     /*else
         col_reduced = 64;*/
-   /* CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
-   pcl::fromPCLPointCloud2(*transformed_inputCloud, *pTarget);*/
-  /* CloudWithNormalPtr pTarget_new(new pcl::PointCloud <PointNormalType>);
-   pTarget_new = pTarget;*/
-  
-   // size_t total_num_points = pTarget->points.size();
+        /* CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
+        pcl::fromPCLPointCloud2(*transformed_inputCloud, *pTarget);*/
+        /* CloudWithNormalPtr pTarget_new(new pcl::PointCloud <PointNormalType>);
+         pTarget_new = pTarget;*/
+
+         // size_t total_num_points = pTarget->points.size();
     index_index_map.clear();
-   // int i = 0;
-   // Eigen::Vector3f test1(0.0, 0.0, 0.0);
+    // int i = 0;
+    // Eigen::Vector3f test1(0.0, 0.0, 0.0);
     float max_radius;
-   // _dV dv;
+    // _dV dv;
     _dV dv1;
-    std::vector<_dV>temp;
-    temp.resize(num_division_col, dv1);
-  //  std::cout << "after col copy constructor" << std::endl;
-    std::vector<std::vector<_dV>>temp_descriptor_content;
-    temp_descriptor_content.resize(num_division_row, temp);
-   // temp_descriptor_content.resize(num_division_row, std::vector<_dV>(num_division_col, dv));
-  /*  descriptor_content.clear();
-    descriptor_content.shrink_to_fit();
-   
-    descriptor_content.resize(num_division_row, std::vector<_dV>(num_division_col, dv));*/
+    /* std::vector<_dV>temp;
+     temp.resize(num_division_col, dv1);*/
+     //  std::cout << "after col copy constructor" << std::endl;
+    std::vector<std::vector<_dV>>temp_descriptor_content(num_division_row, std::vector<_dV>(num_division_col, dv1));
+    // CirconImage temp_image2d(num_division_col, num_division_row);
+    // temp_descriptor_content.resize(num_division_row, temp);
+    // temp_descriptor_content.resize(num_division_row, std::vector<_dV>(num_division_col, dv));
+   /*  descriptor_content.clear();
+     descriptor_content.shrink_to_fit();
+
+     descriptor_content.resize(num_division_row, std::vector<_dV>(num_division_col, dv));*/
     std::map<float, int>d_map;// = { {-INFINITY, -1} };
-    vector_of_maps.clear();  
-    vector_of_maps.resize(num_division_row *num_division_col);
+   /* vector_of_maps.clear();
+    vector_of_maps.resize(num_division_row *num_division_col);*/
     std::vector<size_t>indices_list;
     bool use_z_max = false;
-   
-     Eigen::Matrix4d tfs = Eigen::Matrix4d::Identity();
+
+    Eigen::Matrix4d tfs = Eigen::Matrix4d::Identity();
     Eigen::Matrix4f temp_wl = WorldLocalTransformation.inverse();
     std::unique_ptr<ON_NurbsSurface> nb_surface_tfs = surface::cNurbsSurface::TransformControlPointsOfNurbsSurface(nb_surface, WorldLocalTransformation.cast<double>()); //
- 
+
     surface::Ray_Intersect r_it(*nb_surface_tfs);
     r_it.x0 = nb_surface.Knot(0, 0);
     r_it.x1 = nb_surface.Knot(0, nb_surface.KnotCount(0) - 1);
@@ -187,23 +188,23 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
     float  min_value = INFINITY;
     float  max_value = -INFINITY;
     double total_trim_time = 0; double total_eval_time = 0;
-//
+    //
     int countItr = 0;
-//#pragma omp parallel for
+    //#pragma omp parallel for
     for (int i = 0; i < num_division_row; ++i)
     {
 
         for (int j = 0; j < col_reduced; ++j)
         {
-          /*  if (i == 248 && j == 62)
-            {
-                std::cout << "here" << std::endl;
-            }*/
+            /*  if (i == 248 && j == 62)
+              {
+                  std::cout << "here" << std::endl;
+              }*/
             int curr_position = i * num_division_col + j;
             double x = static_cast<double>((j * rad_resolution) * cos(-(i - 1)* angle_resolution));
             double y = static_cast<double>((j * rad_resolution) * sin(-(i - 1)* angle_resolution));
             Eigen::Vector2d qPoint(x, y);
-           // Eigen::Vector2d pt(x, y);
+            // Eigen::Vector2d pt(x, y);
             std::vector<size_t>indices_list;
             cGrid2D.query(&indices_list, qPoint, SORT_MULTI, 2.0 *avgpoint_dist);
             if (indices_list.size() > 0)
@@ -214,14 +215,14 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
                     r_it.xyz.head<2>() = Eigen::Vector2d(x, y);
                     r_it.init_param = st_params[pt_idx];
                     Eigen::Vector2d optim_parameter;
-                    if (true ) // col_reduced
+                    if (true) // col_reduced
                     {
                         auto start = std::chrono::high_resolution_clock::now();
-                        double error = surface::cNurbsSurface::ComputeOptimizedParameterSpaceValue(r_it, 1e-5, 
+                        double error = surface::cNurbsSurface::ComputeOptimizedParameterSpaceValue(r_it, 1e-5,
                             optim_parameter, false);
-                       
-                      //  bool inside = surface::TrimInputSurfaceUsingCurveBoundary(optim_parameter, *nb_surface_tfs, 
-                       //     nb_curve, a0, a1, scale);
+
+                        //  bool inside = surface::TrimInputSurfaceUsingCurveBoundary(optim_parameter, *nb_surface_tfs, 
+                         //     nb_curve, a0, a1, scale);
                         bool inside = _pGrid.query(optim_parameter);
                         auto end = std::chrono::high_resolution_clock::now();
                         double trim_time = std::chrono::duration_cast<
@@ -238,41 +239,45 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
                             double executeopto = std::chrono::duration_cast<
                                 std::chrono::duration<double, std::milli>>(endopto - startopto).count();
                             executeopto = executeopto / double(1000);
-                          //  std::cout << " optimization time per cell:" << executeopto << std::endl;
+                            //  std::cout << " optimization time per cell:" << executeopto << std::endl;
                             error = (r_it.xyz.head<2>() - vec3[0].head<2>()).squaredNorm();
                             if (error < 1e-4)
                             {
                                 vec3[1].normalize();
                                 vec3[2].normalize();
-                               // Eigen::VectorXd pt = Eigen::VectorXd::Zero(6);
+                                // Eigen::VectorXd pt = Eigen::VectorXd::Zero(6);
                                 PointNormalType pt;
                                 pt.getVector3fMap() = vec3[0].cast<float>();
                                 pt.getNormalVector3fMap() = (vec3[1].cross(vec3[2])).normalized().cast<float>();
-                             /*   pt.head<3>() = vec3[0];
-                                pt.tail<3>() = (vec3[1].cross(vec3[2])).normalized();*/
-                                float val = std::round(vec3[0][2] / height_resolution);
+                                /*   pt.head<3>() = vec3[0];
+                                   pt.tail<3>() = (vec3[1].cross(vec3[2])).normalized();*/
+                                   //currently store only z-values
+                                 float val = std::round(vec3[0][2] / height_resolution);
+                               // double step_size = max_radius / 512;
+                                 //float val = vec3[0][2]/step_size;
 
-                              /*  Eigen::Matrix3f rot = temp_wl.block<3, 3>(0, 0);
-                                Eigen::Vector3f trans = temp_wl.block<3, 1>(0, 3);*/
-                                PointNormalType pt_dash;
-                                
+                                /*  Eigen::Matrix3f rot = temp_wl.block<3, 3>(0, 0);
+                                  Eigen::Vector3f trans = temp_wl.block<3, 1>(0, 3);*/
+                                PointNormalType pt_dash; /*= pcl::transformPoint(pt, Eigen::Affine3f(temp_wl));*/
+
                                 pt_dash.getVector3fMap() = temp_wl.block<3, 3>(0, 0) * pt.getVector3fMap() +
                                     temp_wl.block<3, 1>(0, 3);
                                 pt_dash.getNormalVector3fMap() = temp_wl.block<3, 3>(0, 0) *  pt.getNormalVector3fMap();
-                /*                    Eigen::VectorXf pt_dash = Eigen::VectorXf::Zero(6);
-                                pt_dash.head<3>() = temp_wl.block<3, 3>(0, 0) * pt.head<3>().cast<float>() + 
-                                    temp_wl.block<3, 1>(0, 3);
-                                pt_dash.tail<3>() = temp_wl.block<3, 3>(0, 0) * pt.tail<3>().cast<float>();*/
+                                /*                    Eigen::VectorXf pt_dash = Eigen::VectorXf::Zero(6);
+                                                pt_dash.head<3>() = temp_wl.block<3, 3>(0, 0) * pt.head<3>().cast<float>() +
+                                                    temp_wl.block<3, 1>(0, 3);
+                                                pt_dash.tail<3>() = temp_wl.block<3, 3>(0, 0) * pt.tail<3>().cast<float>();*/
                                 if (true)
                                     Image2D.addCellAt(i, j, num_division_col, val);
+                                // temp_image2d.addCellAt(i, j, num_division_col, val);
                                 int linearized_cell_index = i * num_division_col + j;
-                               
+
                                 _dV data(/*i, j,*/cellSate::VALID, linearized_cell_index, pt_idx,
                                     val, optim_parameter, pt_dash/*.cast<double>()*/);
                                 temp_descriptor_content[i][j] = std::move(data);
                                 total_eval_time += executeopto;
                                 total_trim_time += trim_time;
-                        
+
                                 if (val < min_value)
                                 {
                                     min_value = val;
@@ -281,8 +286,8 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
                                 {
                                     max_value = val;
                                 }
-                               /* if (num_division_row == 512 && itr >=5)
-                                    std::cout << "Exist iterator:" << itr << "/" << indices_list.size() << std::endl;*/
+                                /* if (num_division_row == 512 && itr >=5)
+                                     std::cout << "Exist iterator:" << itr << "/" << indices_list.size() << std::endl;*/
                                 break;
                             }
 
@@ -291,41 +296,41 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
 
                 }
             }
-          ////  kdTree.radiusSearch(qPoint, radius, indices_list, dist_list);
-          //  if (!use_z_max && indices_list.size() > 0)
-          //  {
-          //      for (int itr = 0; itr < indices_list.size(); itr++)
-          //      {
-          //          int pt_idx = indices_list[itr];
-          //         // float dist = dist_list[itr];
-          //         /* if (dist < 0.3 * rad_resolution)
-          //          {*/
-          //          float val = pTarget->points[pt_idx].z;
-          //          vector_of_maps[curr_position][val] = pt_idx;
-          //             // int_uv_map[curr_position] = { pt_idx };
-          //   
-          //              
-          //         /* }*/
-          //      }
-          //      countItr++;
-          //  }
-    
+            ////  kdTree.radiusSearch(qPoint, radius, indices_list, dist_list);
+            //  if (!use_z_max && indices_list.size() > 0)
+            //  {
+            //      for (int itr = 0; itr < indices_list.size(); itr++)
+            //      {
+            //          int pt_idx = indices_list[itr];
+            //         // float dist = dist_list[itr];
+            //         /* if (dist < 0.3 * rad_resolution)
+            //          {*/
+            //          float val = pTarget->points[pt_idx].z;
+            //          vector_of_maps[curr_position][val] = pt_idx;
+            //             // int_uv_map[curr_position] = { pt_idx };
+            //   
+            //              
+            //         /* }*/
+            //      }
+            //      countItr++;
+            //  }
+
         }
     }
-   /* std::cout << "total evaluation time:" << total_eval_time << std::endl;
-    std::cout << "total trim time:" << total_trim_time << std::endl;*/
-   // std::cout << " optimize and trimming time:" << executeopto << std::endl;
-   // std::cout << countItr << "/" <<vector_of_maps.size() << std::endl;
-   
-   /* float  min_value = INFINITY;
-    float  max_value = -INFINITY;*/
+    /* std::cout << "total evaluation time:" << total_eval_time << std::endl;
+     std::cout << "total trim time:" << total_trim_time << std::endl;*/
+     // std::cout << " optimize and trimming time:" << executeopto << std::endl;
+     // std::cout << countItr << "/" <<vector_of_maps.size() << std::endl;
+
+     /* float  min_value = INFINITY;
+      float  max_value = -INFINITY;*/
     if (use_z_max)
     {
-       std::vector<std::vector<float>>data = Image2D.getImageData();
-   
-       
+        std::vector<std::vector<float>>data = Image2D.getImageData();
+
+
         int valid_index = 0;
-    
+
         for (int itr = 0; itr < num_division_row; itr++)
         {
             for (int icx = 0; icx < num_division_col; icx++)
@@ -348,214 +353,30 @@ void CirconImageDescriptor:: ComputeFeature(const CUniformGrid2D &cGrid2D, const
             }
         }
     }
-    //else
-    //{
-    //    std::vector<std::map<float, int>>::iterator it;
-    //    int n = 1;
-    //    
-    //    int iIndex = 0, iPixelCount = 0;
-    //   // std::cout << "Number of Valid cell:" << vector_of_maps.size() << std::endl;
-    // 
-    //    for (it = vector_of_maps.begin(); it != vector_of_maps.end(); it++)
-    //    {
-    //       /* if (it->size() > 0)
-    //        {*/
-    //            int iCount = 0;
-    //           /* if (iIndex == 38 || iIndex == 39)
-    //                std::cout << "more time" << std::endl;*/
-    //           // auto startopto = std::chrono::high_resolution_clock::now();
-    //            auto max_z_itr = it->rbegin();
-    //            auto startopto = std::chrono::high_resolution_clock::now();
-    //            for (auto itt = it->rbegin(); itt != it->rend(); ++itt)
-    //            {
-    //                //int indx = it - vector_of_maps.begin();
-    //               // iCount = std::distance(it->begin(), itt);
-    //               /* if (iCount >= 5)
-    //                {
-    //                    std::pair<int, int> uv_;
-    //                    uv_.first = iIndex / num_division_col;
-    //                    uv_.second = iIndex %num_division_col; 
-    //                    float val = std::round(pTarget->points[max_z_itr->second].z / height_resolution);
-    //                    Eigen::VectorXd pt = Eigen::VectorXd::Zero(6);
-    //                    pt.head<3>() = Eigen::Vector3d(pTarget->points[max_z_itr->second].x, pTarget->points[max_z_itr->second].y, 
-    //                        pTarget->points[max_z_itr->second].z);
-    //                    pt.tail<3>() = pTarget->points[max_z_itr->second].getNormalVector3fMap().cast<double>();
-    //                    Eigen::Matrix3f rot = temp_wl.block<3, 3>(0, 0);
-    //                    Eigen::Vector3f trans = temp_wl.block<3, 1>(0, 3);
-    //                    Eigen::VectorXf pt_dash = Eigen::VectorXf::Zero(6);
-    //                    pt_dash.head<3>() = rot * pt.head<3>().cast<float>() + trans;
-    //                    pt_dash.tail<3>() = rot * pt.tail<3>().cast<float>();
-    //                    Image2D.addCellAt(uv_.first, uv_.second, num_division_col, val);
-    //                    int linearized_cell_index = uv_.first * num_division_col + uv_.second;
-    //                    descriptor_content[uv_.first][uv_.second] = _dV(uv_.first, uv_.second, linearized_cell_index, max_z_itr->second,
-    //                        val, st_params[max_z_itr->second], pt_dash.cast<double>());
-    //                    break;
-    //                }*/
 
-    //                //    float val = std::round(pTarget->points[idx->second].z / height_resolution);
-    //                //    pt.tail<3>() = pTarget->points[idx->second].getNormalVector3fMap().cast<double>();
-    //                //    Eigen::Matrix3f rot = temp_wl.block<3, 3>(0, 0);
-    //                //    Eigen::Vector3f trans = temp_wl.block<3, 1>(0, 3);
-    //                //    Eigen::VectorXf pt_dash = Eigen::VectorXf::Zero(6);
-    //                //    pt_dash.head<3>() = rot * pt.head<3>().cast<float>() + trans;
-    //                //    pt_dash.tail<3>() = rot * pt.tail<3>().cast<float>();
-    //                //    Image2D.addCellAt(uv_.first, uv_.second, num_division_col, val);
-    //                //    int linearized_cell_index = uv_.first * num_division_col + uv_.second;
-    //                //    descriptor_content[uv_.first][uv_.second] = _dV(uv_.first, uv_.second, linearized_cell_index, idx->second,
-    //                //        val, st_params[idx->second], pt_dash.cast<double>());
-    //                //    if (val < min_value)
-    //                //    {
-    //                //        min_value = val;
-    //                //    }
-    //                //    if (val > max_value)
-    //                //    {
-    //                //        max_value = val;
-    //                //    }
+    // quantize the z-value & store
+   /* float max_z = max_value - min_value;
+    height_resolution = max_z / num_height_division;
+    for (int i = 0; i < num_division_row; ++i)
+    {
 
-    //                //    std::cout << "break count :" << iCount << std::endl;*/
-    //                //    break;
-    //            
-    //                //}
-    //                // r_it.xyz.head<2>() = Eigen::Vector2d(pTarget->points[itt->second].x, pTarget->points[itt->second].y);
-    //                std::pair<int, int>uv;
-    //                uv.first = iIndex / num_division_col;
-    //                uv.second = iIndex %num_division_col;
-    //                int point_idx = itt->second;// int_uv_map[iIndex];
-    //                /*uv.first = indx / num_division_col;
-    //                uv.second = indx % num_division_col;*/
+        for (int j = 0; j < col_reduced; ++j)
+        {
 
-    //                double x = static_cast<double>((uv.second * rad_resolution) * cos(-(uv.first - 1)* angle_resolution));
-    //                double y = static_cast<double>((uv.second * rad_resolution) * sin(-(uv.first - 1)* angle_resolution));
-    //                r_it.xyz.head<2>() = Eigen::Vector2d(x, y);
-    //                r_it.init_param = st_params[point_idx];
-    //                Eigen::Vector2d optim_parameter;
-
-    //                if (uv.second < num_division_col) // col_reduced
-    //                {
-    //                   
-    //                    double error = surface::cNurbsSurface::ComputeOptimizedParameterSpaceValue(r_it, 1e-5, optim_parameter, false);
-    //                    bool inside = surface::TrimInputSurfaceUsingCurveBoundary(optim_parameter, *nb_surface_tfs, nb_curve);
-    //                    
-    //                    Eigen::Vector3d vec3[3];
-    //                    /*   if (uv.first == 2 && uv.second == 7)
-    //                      std::cout << "Iam here:" << uv.first << uv.second << std::endl;*/
-    //                    if (inside)
-    //                    {
-    //                      
-    //                        nb_surface_tfs->Evaluate(optim_parameter(0), optim_parameter(1), 1, 3, &vec3[0][0]);
-    //                        
-    //                        error = (r_it.xyz.head<2>() - vec3[0].head<2>()).squaredNorm();
-    //                        //iCount = std::distance(it->begin(), itt);
-    //                        if (error < 1e-4 /*&& iCount < 5*/)
-    //                        {
-    //                            /* if (uv.first == 2 && uv.second == 6)
-    //                                 std::cout << "Iam here:" << uv.first << uv.second << std::endl;*/
-
-    //                            vec3[1].normalize();
-    //                            vec3[2].normalize();
-    //                            Eigen::VectorXd pt = Eigen::VectorXd::Zero(6);
-    //                            pt.head<3>() = vec3[0];
-    //                            pt.tail<3>() = (vec3[1].cross(vec3[2])).normalized();
-    //                            float val = std::round(vec3[0][2] / height_resolution);
-
-    //                            Eigen::Matrix3f rot = temp_wl.block<3, 3>(0, 0);
-    //                            Eigen::Vector3f trans = temp_wl.block<3, 1>(0, 3);
-    //                            Eigen::VectorXf pt_dash = Eigen::VectorXf::Zero(6);
-    //                            pt_dash.head<3>() = rot * pt.head<3>().cast<float>() + trans;
-    //                            pt_dash.tail<3>() = rot * pt.tail<3>().cast<float>();
-    //                            Image2D.addCellAt(uv.first, uv.second, num_division_col, val);
-    //                            int linearized_cell_index = uv.first * num_division_col + uv.second;
-
-    //                            /*  pt.head<3>() = original_cloud_with_normal->points[itt->second].getVector3fMap().cast<double>();
-    //                              pt.tail<3>() = original_cloud_with_normal->points[itt->second].getNormalVector3fMap().cast<double>();*/
-    //                            descriptor_content[uv.first][uv.second] = _dV(uv.first, uv.second, linearized_cell_index, point_idx,
-    //                                val, optim_parameter, pt_dash.cast<double>());
-    //                            // std::cout << uv.first << "," << uv.second << "," << val << std::endl;
-    //                            if (val < min_value)
-    //                            {
-    //                                min_value = val;
-    //                            }
-    //                            if (val > max_value)
-    //                            {
-    //                                max_value = val;
-    //                            }
-
-    //                            //std::cout << "break count :" << iCount << std::endl;
-    //                            //                            // std::cout << "cell count :" << iIndex << std::endl;
-    //                            break;
-    //                        }
-    ////                       /* else if (iCount > 10)
-    ////                        {
-    ////                            auto idx = it->begin();
-    ////                            std::pair<int, int> uv_ = int_uv_map[idx->second];
-    ////                            double x_ = static_cast<double>((uv_.second * rad_resolution) * cos(-(uv_.first - 1)* angle_resolution));
-    ////                            double y_ = static_cast<double>((uv_.second * rad_resolution) * sin(-(uv_.first - 1)* angle_resolution));
-    ////                            Eigen::VectorXd pt = Eigen::VectorXd::Zero(6);
-    ////                            pt.head<3>() = Eigen::Vector3d(x_,y_, pTarget->points[idx->second].z);
-
-    ////                            float val = std::round(pTarget->points[idx->second].z / height_resolution);
-    ////                            pt.tail<3>() = pTarget->points[idx->second].getNormalVector3fMap().cast<double>();
-    ////                            Eigen::Matrix3f rot = temp_wl.block<3, 3>(0, 0);
-    ////                            Eigen::Vector3f trans = temp_wl.block<3, 1>(0, 3);
-    ////                            Eigen::VectorXf pt_dash = Eigen::VectorXf::Zero(6);
-    ////                            pt_dash.head<3>() = rot * pt.head<3>().cast<float>() + trans;
-    ////                            pt_dash.tail<3>() = rot * pt.tail<3>().cast<float>();
-    ////                            Image2D.addCellAt(uv_.first, uv_.second, num_division_col, val);
-    ////                            int linearized_cell_index = uv_.first * num_division_col + uv_.second;
-    ////                            descriptor_content[uv_.first][uv_.second] = _dV(uv_.first, uv_.second, linearized_cell_index, idx->second,
-    ////                                val, optim_parameter, pt_dash.cast<double>());
-    ////                            if (val < min_value)
-    ////                            {
-    ////                                min_value = val;
-    ////                            }
-    ////                            if (val > max_value)
-    ////                            {
-    ////                                max_value = val;
-    ////                            }
-
-    //        /*                    std::cout << "break count :" << iCount << std::endl;
-    //                            break;
-    //                        }*/
-    //                    }
-    //                  /*  else
-    //                    {
-    //                        float val = std::round(pTarget->points[point_idx].z / height_resolution);
-    //                        Image2D.addCellAt(uv.first, uv.second, num_division_col, val);
-    //                        iPixelCount++;
-    //                        break;
-    //                    }*/
-    //                }
-    //                iCount++;
-    //            }
-    //          /*  auto endopto = std::chrono::high_resolution_clock::now();
-    //            double executeopto = std::chrono::duration_cast<
-    //                std::chrono::duration<double, std::milli>>(endopto - startopto).count();
-    //            executeopto = executeopto / double(1000);
-    //            std::cout << " optimize and trimming time:" << executeopto << std::endl;*/
-
-    ////            //auto endopto = std::chrono::high_resolution_clock::now();
-    ////            //double executeopto = std::chrono::duration_cast<
-    ////            //    std::chrono::duration<double, std::milli>>(endopto - startopto).count();
-    ////            //executeopto = executeopto / double(1000);
-    ////            //std::cout << " optimize and trimming time:" << executeopto << std::endl;
-
-    //            // }
-    //           iIndex++;
-    //       // }
-    //    }
-    //  /*  auto endopto = std::chrono::high_resolution_clock::now();
-    //    double executeopto = std::chrono::duration_cast<
-    //        std::chrono::duration<double, std::milli>>(endopto - startopto).count();
-    //    executeopto = executeopto / double(1000);
-    //   std::cout << " optimize and trimming time:" << executeopto << std::endl;*/
-    //   // std::cout << iPixelCount << "/" << vector_of_maps.size() << std::endl;
-    //}
-   
-    max_value_image = max_value;
-    min_value_image =  min_value;
-   // descriptor_content = refined_descriptor_content;
+            if (temp_descriptor_content[i][j].state == cellSate::VALID)
+            {
+                float val = std::round(temp_descriptor_content[i][j].val_at_pixel / height_resolution);
+                temp_descriptor_content[i][j].val_at_pixel = val;
+                Image2D.addCellAt(i, j, num_division_col, val);
+            }
+        }
+    }*/
+    max_value_image = max_value/* / height_resolution*/;
+    min_value_image = min_value /*/ height_resolution*/;
+    // descriptor_content = refined_descriptor_content;
     descriptor_content = std::move(temp_descriptor_content);
-  
+    //Image2D = std::move(temp_image2d);
+
 }
 void CirconImageDescriptor::ComputeFeature(int i)
 {
@@ -753,10 +574,10 @@ void CirconImageDescriptor::ConstructLocalFrameOfReference()
 {
     Eigen::Vector3f query_idx_normal = RotationAxisPoint.getNormalVector3fMap();
     Eigen::Vector3f new_vec = Eigen::Vector3f(0.0, 1.0, 0.0).cross(query_idx_normal);
-    Eigen::Vector3f x_bar = new_vec / new_vec.norm();
+    Eigen::Vector3f x_bar = new_vec.normalized();// / new_vec.norm();
     Eigen::Matrix3f rotation_matrix = Eigen::Matrix3f::Identity();
     rotation_matrix.row(0) = x_bar;
-    rotation_matrix.row(1) = query_idx_normal.cross(x_bar);
+    rotation_matrix.row(1) = (query_idx_normal.cross(x_bar)).normalized();
     rotation_matrix.row(2) = query_idx_normal;
     Local_Coordinate_Frame.resize(3);
     Local_Coordinate_Frame[0] = rotation_matrix.row(0);
@@ -887,6 +708,7 @@ void CirconImageDescriptor::SetImageDescriptorResolution(float full_angle, float
         SetAngularResolution(full_angle, up_resolution_count);
         SetRadialResolution(max_radius, up_resolution_count);
         HeightResolution(height_max, num_height_division);
+       // HeightResolution(height_max, num_height_division);
     }
     else
     {
@@ -894,8 +716,9 @@ void CirconImageDescriptor::SetImageDescriptorResolution(float full_angle, float
         /*  if (num_division_row >= 256)
         SetRadialResolution(max_radius, num_division_row);
         else*/
+       // std::cout << " I am here:" << std::endl;
         SetRadialResolution(max_radius, num_division_col);
-        HeightResolution(height_max, num_height_division);
+        HeightResolution(height_max, num_division_col);
     }
 }
 void CirconImageDescriptor::SetDivision(int num_rows, int num_cols, int num_hei)
@@ -909,6 +732,12 @@ void CirconImageDescriptor::SetInputAsTransformedCloud(CloudWithoutType InputClo
     transformed_inputCloud = inputCloud;
     CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
     pcl::fromPCLPointCloud2(*transformed_inputCloud, *pTarget);
+}
+
+void CirconImageDescriptor::GetRangeForImage(float &max, float &min)
+{
+    max = max_value_image;
+    min = min_value_image;
 }
 void CirconImageDescriptor::WriteDescriptorAsImage(std::string FileName)
 {
@@ -1004,10 +833,10 @@ void CirconImageDescriptor::ReconstructPointCloud()
         {
             if (img_data[idx][icx] != -INFINITY)
             {
-
+                double step_size = max_radius / 512;
                 float x_value = (icx * rad_resolution) * cos(-(idx - 1)* angle_resolution);
                 float y_value = (icx * rad_resolution) * sin(-(idx - 1)* angle_resolution);
-                float z_value = img_data[idx][icx] * height_resolution;
+                float z_value = img_data[idx][icx] *  height_resolution;
                 Eigen::Vector4f recon_pt(x_value, y_value, z_value, 1.0);
                 recon_pt = WorldLocalTransformation.inverse() * recon_pt;
                 reconstructed_points.emplace_back(recon_pt.head<3>());
@@ -1207,12 +1036,16 @@ void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Ei
 
 
    
-   // CloudWithoutType transformed_cloud = TransformPointToLocalFrame();
+    CloudWithoutType transformed_cloud = TransformPointToLocalFrame();
 
     CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
-  //  pcl::fromPCLPointCloud2(*transformed_cloud, *pTarget);
-    pcl::transformPointCloudWithNormals(*original_cloud_with_normal, *pTarget, WorldLocalTransformation);
-    float height = ComputeheightFromPointCloud(pTarget);
+    pcl::fromPCLPointCloud2(*transformed_cloud, *pTarget);
+
+    Eigen::Vector3f min_pt;
+    Eigen::Vector3f max_pt;
+    float diag_length1 = tool::ComputeOrientedBoundingBoxOfCloud(pTarget, min_pt, max_pt);
+ //  pcl::transformPointCloudWithNormals(*original_cloud_with_normal, *pTarget, WorldLocalTransformation);
+    float height =  ComputeheightFromPointCloud(pTarget);
     CUniformGrid2D cGrid2D( avgpoint_dist,
         /* point accessor */
         [&pTarget](Eigen::Vector2d *out_pnt, double *out_attrib, size_t idx) -> bool
@@ -1228,7 +1061,7 @@ void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Ei
             return false;
     }
         ); 
-    SetImageDescriptorResolution(2.0 *M_PI, max_radius, height);
+    SetImageDescriptorResolution(2.0 *M_PI, max_radius, max_radius);
     Image2D.clearMatrix();
     auto startItr = std::chrono::high_resolution_clock::now();
     ComputeFeature(cGrid2D, pGrid);
@@ -1374,6 +1207,42 @@ CirconImage::CirconImage(int columns, int rows)
 
 }
 
+CirconImage::CirconImage(const CirconImage &img)
+{
+    columns = img.columns;
+    rows = img.rows;
+    cell = img.cell;
+    image = img.image;
+}
+CirconImage::CirconImage(CirconImage &&img)
+{
+    columns = std::move(img.columns);
+    rows = std::move(img.rows);
+    cell = std::move(img.cell);
+    image = std::move(img.image);
+}
+CirconImage& CirconImage:: operator=(const CirconImage &img)
+{
+    if (this == &img)
+        return *this;
+    columns = img.columns;
+    rows = img.rows;
+    cell = img.cell;
+    image = img.image;
+    return *this;
+}
+CirconImage& CirconImage:: operator=( CirconImage &&img)
+{
+    if (this == &img)
+        return *this;
+    columns = std::move(img.columns);
+    rows = std::move(img.rows);
+    cell = std::move(img.cell);
+    image = std::move(img.image);
+    img.columns = -1;
+    img.rows = -1;
+    return *this;
+}
 CirconImage::~CirconImage()
 {
     cell.clear();
@@ -1383,6 +1252,7 @@ void CirconImage::addCellAt(int row, int col, int col_div, float entry)
 {
     int index = row * col_div + col;
     cell[index] = entry;
+  //  std::cout << "row:" << row << std::endl;
     image[row][col] = entry;
 }
 float CirconImage::getCell(int row, int column, int col_div)

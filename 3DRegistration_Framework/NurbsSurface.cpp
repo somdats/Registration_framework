@@ -809,7 +809,8 @@ bool cNurbsSurface::EvaluateParameterForCoordinate3D(Eigen::Vector2d &optim_para
     /*   }*/
     return inside;
 }
-void cNurbsSurface::CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, const ON_NurbsCurve &Curve, CloudWithNormalPtr &cloud, std::vector<Eigen::Vector2d> &st_params, const unsigned  &segX, const unsigned &segY)
+void cNurbsSurface::CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, const ON_NurbsCurve &Curve, 
+    CloudWithNormalPtr &cloud, std::vector<Eigen::Vector2d> &st_params, const unsigned  &segX, const unsigned &segY)
 {
   double x0 = nurb.Knot(0, 0);
   double x1 = nurb.Knot(0, nurb.KnotCount(0) - 1);
@@ -858,7 +859,7 @@ void cNurbsSurface::CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, 
               if (z(2) >= 0.0)
               {
                   cloud->push_back(pt);
-                  st_params.push_back(st);
+                  st_params.emplace_back(st);
               }
           }
       }

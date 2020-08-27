@@ -7,6 +7,7 @@
 #include <chrono>
 #include"UniformGrid.h"
 
+
 enum cellSate
 {
     INVALID = 0,
@@ -127,6 +128,10 @@ public:
     CirconImage() {}
     CirconImage(int columns, int rows);
     ~CirconImage();
+    CirconImage(const CirconImage &img);
+    CirconImage(CirconImage &&img);
+    CirconImage& operator=(const CirconImage &img);
+    CirconImage& operator=( CirconImage &&img);
 
     void addCellAt(int row, int col,int col_div, float entry);
     float getCell(int row, int column, int col_div);
@@ -233,6 +238,7 @@ public:
     void setParametergrid(const cParameterGrid &pGrid);
    cParameterGrid GetParameterGrid();
    std::unique_ptr<cParameterGrid> duplicate(std::unique_ptr<cParameterGrid> const& ptr);
+   void GetRangeForImage(float &max, float &min);
   
 protected:
     CloudWithoutType inputCloud;

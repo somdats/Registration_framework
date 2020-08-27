@@ -3,6 +3,8 @@
 #include <tuple> // For std::tie
 #include <vector> // For std::vector
 #include <iterator> // For global begin() and end()
+#include<iostream>
+#include<functional>
 
 #include"ICorrespondenceEstimator.h"
 #include"CirconDescriptor.h"
@@ -79,7 +81,7 @@ public:
             primary_idx(std::move(M.primary_idx)), pix_value(std::move(M.pix_value)), 
             descriptor_content(std::move(M.descriptor_content))
         {
-            std::cout << "Move Constructor of Measure called:" << std::endl;
+          //  std::cout << "Move Constructor of Measure called:" << std::endl;
           
         }
 
@@ -112,7 +114,7 @@ public:
             primary_idx = M.primary_idx;
             pix_value = M.pix_value;
             descriptor_content = M.descriptor_content;// = M.descriptor_content;
-            std::cout << "assignment operator of Measure called:" << std::endl;
+          //  std::cout << "assignment operator of Measure called:" << std::endl;
             return *this;
         }
         //Measure(const Measure &M)
@@ -158,7 +160,7 @@ public:
             M.WlTransform = Eigen::Matrix4f::Identity();
             M.primary_idx = -1;
             M.pix_value = -1;
-            std::cout << "Move assignment of Measure called:" << std::endl;
+          //  std::cout << "Move assignment of Measure called:" << std::endl;
             return *this;
         }
        void Reset()
@@ -184,7 +186,11 @@ public:
         const bool &cloud_type = false);
     void PrepareTargetDescriptor(PointNormalType rotpoint);
     //TODO functions to select point of interest in source and target cloud
-    float ComputeMeasureOfSimilarity(std::vector<std::vector<float>> &src_image, std::vector<std::vector<float>> &tar_image);
+    float ComputeMeasureOfSimilarity(std::vector<std::vector<float>> &src_image, 
+        std::vector<std::vector<float>> &tar_image);
+    float ComputeSimilarityScore(std::vector<std::vector<float>> &src_image,
+        const std::vector<std::vector<float>> &tar_image, float max_src = 0.0 , float min_src = 0.0 , 
+        float max_tgt = 0.0, float min_tgt = 0.0);
     CirconImageDescriptor TransformCirconDescriptor( int index);
     Measure CompareDescriptorWithSimilarityMeasure(const std::vector<std::vector<float>> &src_image, const std::vector<std::vector<float>> &tar_image);
     void CompareDescriptor(const std::vector<std::vector<float>> &src_image,
@@ -212,8 +218,8 @@ public:
  void SetParameterForSimilarityMeasure(float row, float lambda);
  std::pair<PointNormalType, PointNormalType> ComputeFictituousCorrespondencePair(const PointNormalType &qSrcPt, const PointNormalType &qtgtPt, const pcl::KdTreeFLANN<PointNormalType> &ktree_src,
    const  pcl::KdTreeFLANN<PointNormalType> &ktree_tar, float avgDist, Eigen::Matrix4f curr_transform, std::pair<int,int>&index_pair);
- std::pair<float, float> EstimateStopParameter(std::pair<PointNormalType, PointNormalType>corres_pair, std::pair<int, int>index_pair, 
-     Eigen::Matrix4f Pair_Transform, Eigen::Matrix4f Corres_Transform);
+ std::pair<float, float> EstimateStopParameter( const std::pair<PointNormalType, PointNormalType> &corres_pair, const std::pair<int, int> &index_pair, 
+   const  Eigen::Matrix4f &Pair_Transform,const  Eigen::Matrix4f &Corres_Transform, Eigen::Vector4f &trans_fict);
  static void ComputePointOfInterestbasedOnUniformSampling(CloudWithoutType inputCloud,  double radius, std::string OutputFileName);
  static double ComputeRadiusForSampling(CloudWithoutType CloudA, CloudWithoutType CloudB, double sf);
  float ComputeMaximumRotationShiftParameter(const std::vector<std::vector<float>>&secondary_descriptor, const std::vector<std::vector<float>> &target_point_descriptor,
@@ -226,16 +232,19 @@ int &rotation_idx, int &secondary_dsc_posn);
  void SetBoundingBoxForDescriptors(surface::CloudBoundingBox &src_bbs, surface::CloudBoundingBox &tgt_bbs); 
  CloudPtr Construct2DCloudForKdtreeSearch(const CloudWithNormalPtr &inputCloud, const Eigen::Matrix4f &WorldLocalTransformation);
  std::pair<int, float>  ComputeRotationIndex(const std::vector<std::vector<float>> &src_desc,  std::vector<std::vector<float>> &tar_desc,
-     int row, int col);
+     int row, int col, float max = 0.0, float min = 0.0, float max_tgt = 0.0, float min_tgt = 0.0);
 
  static void ComputeFeaturePoints(const CloudWithoutType &inputCloud, const ON_NurbsSurface &nb_surface,
      const double &radius, std::string OutputFileName);
   void prepareDescriptorForInterestPoint(CirconImageDescriptor& cid, const cParameterGrid &pGrid, PointNormalType rotpoint,
      const bool &use_nurbs_strategy = true);
- std::vector<cEle> SortFeaturePointsOnSimilarityValue(const CloudWithNormalPtr &inputSrcCloud,
+ /*std::vector<cEle> SortFeaturePointsOnSimilarityValue(const CloudWithNormalPtr &inputSrcCloud,
      const CloudWithNormalPtr &inputTgtCloud, CirconImageDescriptor &cid_src, CirconImageDescriptor &cid_tgt, 
+     const float &max_averg_dist);*/
+ std::vector<cEle> SortFeaturePointsOnSimilarityValue(const CloudWithNormalPtr &inputSrcCloud,const CloudWithNormalPtr &inputTgtCloud, 
      const float &max_averg_dist);
  static void SampleDataUniformly(const CloudWithoutType &pc, const float &gSize, const std::string &OutPutFileName);
+ void setDebug(const bool &debug_) { debug = debug_; };
    
 
 
@@ -288,5 +297,6 @@ protected:
     cParameterGrid cParam_Source;
     cParameterGrid cParam_target;
     std::vector <CirconCorrespondence::Measure> similarity_measures_content;
+    bool debug;
     
 };
