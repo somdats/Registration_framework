@@ -138,8 +138,10 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
     int col_reduced;
     if (num_division_row < 32)
         col_reduced = 16; //32
+    else if (num_division_row == 32)
+        col_reduced = 32; //32
     else
-        col_reduced = 32;
+        col_reduced = 64;
     /*else
         col_reduced = 64;*/
         /* CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
@@ -185,6 +187,7 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
     Eigen::Vector3d a0, a1;
     double scale;
     surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(nb_curve, a0, a1, scale);
+    
     float  min_value = INFINITY;
     float  max_value = -INFINITY;
     double total_trim_time = 0; double total_eval_time = 0;
@@ -583,12 +586,13 @@ void CirconImageDescriptor::ConstructLocalFrameOfReference()
     Local_Coordinate_Frame[0] = rotation_matrix.row(0);
     Local_Coordinate_Frame[1] = rotation_matrix.row(1);
     Local_Coordinate_Frame[2] = rotation_matrix.row(2);
-
     
+   // std::cout << query_idx_normal.transpose().rows() << "&" << query_idx_normal.transpose().cols() << std::endl;
     WorldLocalTransformation.setIdentity();
     WorldLocalTransformation.block<3, 3>(0, 0) = rotation_matrix;
     Eigen::Vector3f trans = - (rotation_matrix * RotationAxisPoint.getVector3fMap());
-    WorldLocalTransformation.col(3) = Eigen::Vector4f(trans(0), trans(1), trans(2), 1.0);
+    WorldLocalTransformation.block<3, 1>(0, 3) = trans;
+   // WorldLocalTransformation.col(3) = Eigen::Vector4f(trans(0), trans(1), trans(2), 1.0);
    // std::cout << WorldLocalTransformation * RotationAxisPoint.getVector4fMap() << std::endl;
    
 }
@@ -1043,9 +1047,9 @@ void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Ei
 
     Eigen::Vector3f min_pt;
     Eigen::Vector3f max_pt;
-    float diag_length1 = tool::ComputeOrientedBoundingBoxOfCloud(pTarget, min_pt, max_pt);
+   // float diag_length1 = tool::ComputeOrientedBoundingBoxOfCloud(pTarget, min_pt, max_pt);
  //  pcl::transformPointCloudWithNormals(*original_cloud_with_normal, *pTarget, WorldLocalTransformation);
-    float height =  ComputeheightFromPointCloud(pTarget);
+   // float height =  ComputeheightFromPointCloud(pTarget);
     CUniformGrid2D cGrid2D( avgpoint_dist,
         /* point accessor */
         [&pTarget](Eigen::Vector2d *out_pnt, double *out_attrib, size_t idx) -> bool

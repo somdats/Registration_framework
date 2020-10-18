@@ -328,6 +328,11 @@ namespace
                
             }
        }
+        std::sort(Idx.begin(), Idx.end(), [](const cEle &a, const cEle &b)
+        {
+            if (a.similarity_value != -INF || b.similarity_value != -INF)
+                return a.similarity_value > b.similarity_value;
+        });
         return Idx;
     }
     Eigen::Matrix4f create_affine_matrix(float a, float b, float c, Eigen::Vector3f trans =Eigen::Vector3f(0,0,0))
@@ -495,7 +500,7 @@ surface::CloudBoundingBox CirconCorrespondence::initNurbsPCABoundingBox(int orde
 #pragma omp parallel for  
      for (int iSrc = 0; iSrc < inputSrcCloud->points.size(); iSrc++)
      {
-         CirconImageDescriptor cid_src(input_source, 16, 16, 512, src_cloud_parameter, *nbs_src, *ncs_src);
+         CirconImageDescriptor cid_src(input_source, 16, 16, 16, src_cloud_parameter, *nbs_src, *ncs_src);
          cid_src.SetMaximumAverageDistance(max_averg_dist);
          PointNormalType src_corres = inputSrcCloud->points[iSrc];
          cid_src.SetBasicPointIndex(original_source_index[iSrc]);
@@ -513,7 +518,7 @@ surface::CloudBoundingBox CirconCorrespondence::initNurbsPCABoundingBox(int orde
       #pragma omp parallel for /*collapse(2)*/
      for (int iTgt = 0; iTgt < inputTgtCloud->points.size(); iTgt++)
      {
-         CirconImageDescriptor cid_tgt(input_target, 16, 16, 512, tgt_cloud_parameter, *nbs, *ncs);
+         CirconImageDescriptor cid_tgt(input_target, 16, 16, 16, tgt_cloud_parameter, *nbs, *ncs);
          cid_tgt.SetMaximumAverageDistance(max_averg_dist);
          PointNormalType tar_corres = inputTgtCloud->points[iTgt];
          cid_tgt.SetBasicPointIndex(original_target_index[iTgt]);
@@ -559,6 +564,8 @@ surface::CloudBoundingBox CirconCorrespondence::initNurbsPCABoundingBox(int orde
  }
 Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 {
+    auto start_algo = std::chrono::high_resolution_clock::now();
+   
     CloudWithNormalPtr corrs_source(new pcl::PointCloud<PointNormalType>);
     CloudWithNormalPtr corrs_target(new pcl::PointCloud<PointNormalType>);
     pcl::fromPCLPointCloud2(*srcCloudCorrespondence_, *corrs_source);
@@ -653,8 +660,8 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 
     // addition of new interestpoint detection method//
     // create feature descriptor at coarse resolution////////////////////  
-    CirconImageDescriptor cid_src_feature(input_source, 16, 16, 512, src_cloud_parameter, *nbs_src, *ncs_src);
-    CirconImageDescriptor cid_tgt_feature(input_target, 16, 16, 512, tgt_cloud_parameter, *nbs, *ncs);
+   /* CirconImageDescriptor cid_src_feature(input_source, 16, 16, 512, src_cloud_parameter, *nbs_src, *ncs_src);
+    CirconImageDescriptor cid_tgt_feature(input_target, 16, 16, 512, tgt_cloud_parameter, *nbs, *ncs);*/
     // descriptor initialization ends///////////////////
   
     /* Build descriptor and sort the interest points pair in decreasing order of similarity          */
@@ -681,7 +688,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
    std::vector<Measure>batch_max_measures;
    int batch_max_measure_idx = -1;
    //  print the descriptor building time
-   setDebug(true);
+   setDebug(false);
    int incr_reslolution = 0;
    int level_itr = 0;
    int batch_count = 1;
@@ -692,7 +699,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 
     {
        std::cout << "iitr:" << iitr << std::endl;
-       std::cout << batch_corres_pair[iitr].src_idx << "," << batch_corres_pair[iitr].tgt_idx << std::endl;
+      // std::cout << batch_corres_pair[iitr].src_idx << "," << batch_corres_pair[iitr].tgt_idx << std::endl;
        target_basic_index = batch_corres_pair[iitr].tgt_idx;
        tar_corres =  original_tgt_cloud_with_normal->points[target_basic_index];// corrs_target->at(tIndex);
            // original_target_index[tIndex];
@@ -763,7 +770,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 
                     std::string CloudName = filePath + subfile;
                     cid_source.ReconstructPointCloud();
-                    cid_source.WritePointCloud(CloudName);
+                   // cid_source.WritePointCloud(CloudName);
 
                     //write points from descriptos -> to verify the contents :sanity check
                     /*std::string desc_source_file_name = filePath + "desc_source";
@@ -868,7 +875,8 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                   
                     T2 = max_measure.WlTransform;
                     T1 = cid_target.GetTransformation();
-           
+                   /* if (level_itr == num_resolution - 1 && max_measure.rotation_index == division_row - 1)
+                        max_measure.rotation_index = 0;*/
                     float angle = cid_source.GetAngularResolution() * (max_measure.rotation_index);
                     //  std::cout << "rotation_angle:" << angle << endl;
                     T2_T1.row(0) = Eigen::Vector4f(cos(angle), sin(angle), 0, 0);
@@ -911,7 +919,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                         0.497573,0.000439, 0.867422, -0.166305,
                         0, 0, 0, 1;
 
-                 
+                
 
                     /////////////Create Descriptor @ max resolution/////////////////////
                     CirconImageDescriptor cid_source_max(input_source, division_row, division_col, 
@@ -1001,6 +1009,11 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                                 }
                                 feature_points.clear();
                                 std::cout << "Number of batch processed:" << batch_count << std::endl;
+                                auto end_algo = std::chrono::high_resolution_clock::now();
+                                double extime = std::chrono::duration_cast<
+                                    std::chrono::duration<double, std::milli>>(end_algo - start_algo).count();
+                                extime = extime / double(1000);
+                                std::cout << " total execution time:" << extime << "sec" << std::endl;
                                 return Final_Transformation;
                               /*  similar_transformation.push_back(Final_Transformation);
                                 repeat_counter--;
@@ -1492,7 +1505,7 @@ void CirconCorrespondence ::PrepareDescriptor(CirconImageDescriptor& cid, PointN
     Eigen::Vector3f min_pt;
     Eigen::Vector3f max_pt;
     float diag_length1 = tool::ComputeOrientedBoundingBoxOfCloud(pTarget, min_pt, max_pt);
-    float height =  cid.ComputeheightFromPointCloud(pTarget);
+   // float height =  cid.ComputeheightFromPointCloud(pTarget);
   /*  std::cout << "diagonal length:" << diag_length1 << std::endl;
      std::cout << "height_divide:" << height << std::endl;
       std::cout << "radius_divide:" << maximum_radius  << std::endl;*/
@@ -1827,7 +1840,7 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
         {
             continue;
         }
-
+       
         int secondary_rot_idx;
         if (division_row > 32)
             secondary_rot_idx = start_rotation_index;
@@ -1924,7 +1937,7 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
     double execute = std::chrono::duration_cast<
         std::chrono::duration<double, std::milli>>(end - start).count();
     execute = execute / double(1000);
-    std::cout << "total secondary cell iteration time @" << division_row << ":"<< execute << "sec" << std::endl;
+  //  std::cout << "total secondary cell iteration time @" << division_row << ":"<< execute << "sec" << std::endl;
     //  std::cout << " parameter execution time:" << execute << std::endl;
 //    current_array_of_data = mes.cell_values;
 //    PointNormalType current_point = mes.point_of_interest;
@@ -1977,7 +1990,7 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
         std::chrono::duration<double, std::milli>>(endmove - startmove).count();
     executemove = executemove / double(1000);
     //  std::cout << " move time:" << executemove << std::endl;
-    std::cout << "max_rotation_index" << "@" << division_row << "=" << max_measure.rotation_index << std::endl;
+   std::cout << "max_rotation_index" << "@" << division_row << "=" << max_measure.rotation_index << std::endl;
     /*  auto startmove = std::chrono::high_resolution_clock::now();
       similarity_measures_content = std::move(similarity_measure);
       auto endmove = std::chrono::high_resolution_clock::now();
