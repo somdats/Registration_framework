@@ -476,10 +476,12 @@ surface::CloudBoundingBox CirconCorrespondence::initNurbsPCABoundingBox(int orde
  std::vector<cEle>CirconCorrespondence::SortFeaturePointsOnSimilarityValue(const CloudWithNormalPtr &inputSrcCloud,
      const CloudWithNormalPtr &inputTgtCloud, const float &max_averg_dist)
  {
-     std::unique_ptr<ON_NurbsSurface> nbs = cid_target.GetNurbsSurface();
-     std::unique_ptr<ON_NurbsCurve> ncs = cid_target.GetNurbsCurve();
-     std::unique_ptr<ON_NurbsSurface> nbs_src = cid_source.GetNurbsSurface();
-     std::unique_ptr<ON_NurbsCurve> ncs_src = cid_source.GetNurbsCurve();
+     std::vector<ON_NurbsSurface> nbs = cid_target.GetNurbsSurface();
+     std::vector<ON_NurbsCurve> ncs = cid_target.GetNurbsCurve();
+     std::vector<ON_NurbsSurface> nbs_src = cid_source.GetNurbsSurface();
+     std::vector<ON_NurbsCurve> ncs_src = cid_source.GetNurbsCurve();
+     std::vector<Eigen::Vector2i>cluster_label_src = cid_source.GetClusterLabels();
+     std::vector<Eigen::Vector2i>cluster_label_tgt  = cid_target.GetClusterLabels();
    
     
      std::vector<cEle> idx_similarity_pair;
@@ -497,10 +499,10 @@ surface::CloudBoundingBox CirconCorrespondence::initNurbsPCABoundingBox(int orde
      src_interest_point_descriptors.resize(inputSrcCloud->points.size());
    
    
-#pragma omp parallel for  
+ #pragma omp parallel for  
      for (int iSrc = 0; iSrc < inputSrcCloud->points.size(); iSrc++)
      {
-         CirconImageDescriptor cid_src(input_source, 16, 16, 16, src_cloud_parameter, *nbs_src, *ncs_src);
+         CirconImageDescriptor cid_src(input_source, 16, 16, 16, src_cloud_parameter, nbs_src, ncs_src, cluster_label_src);
          cid_src.SetMaximumAverageDistance(max_averg_dist);
          PointNormalType src_corres = inputSrcCloud->points[iSrc];
          cid_src.SetBasicPointIndex(original_source_index[iSrc]);
@@ -518,7 +520,7 @@ surface::CloudBoundingBox CirconCorrespondence::initNurbsPCABoundingBox(int orde
       #pragma omp parallel for /*collapse(2)*/
      for (int iTgt = 0; iTgt < inputTgtCloud->points.size(); iTgt++)
      {
-         CirconImageDescriptor cid_tgt(input_target, 16, 16, 16, tgt_cloud_parameter, *nbs, *ncs);
+         CirconImageDescriptor cid_tgt(input_target, 16, 16, 16, tgt_cloud_parameter, nbs, ncs, cluster_label_tgt);
          cid_tgt.SetMaximumAverageDistance(max_averg_dist);
          PointNormalType tar_corres = inputTgtCloud->points[iTgt];
          cid_tgt.SetBasicPointIndex(original_target_index[iTgt]);
@@ -608,18 +610,21 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
     kdt_src->setInputCloud(srx);
     pcl::KdTreeFLANN<PointNormalType>::Ptr kdt_tgt(new pcl::KdTreeFLANN < PointNormalType>);
     kdt_tgt->setInputCloud(tgx);*/
-    std::string filePath = "X:/staff/SDutta/GlobalRegistration/";
-    std::unique_ptr<ON_NurbsSurface> nbs = cid_target.GetNurbsSurface();
-    std::unique_ptr<ON_NurbsCurve> ncs = cid_target.GetNurbsCurve();
-    std::unique_ptr<ON_NurbsSurface> nbs_src = cid_source.GetNurbsSurface();
-    std::unique_ptr<ON_NurbsCurve> ncs_src = cid_source.GetNurbsCurve();
+    std::string filePath = "Z:/staff/SDutta/GlobalRegistration/";
+    std::vector<ON_NurbsSurface> nbs = cid_target.GetNurbsSurface();
+    std::vector<ON_NurbsCurve> ncs = cid_target.GetNurbsCurve();
+    std::vector<ON_NurbsSurface> nbs_src = cid_source.GetNurbsSurface();
+    std::vector<ON_NurbsCurve> ncs_src = cid_source.GetNurbsCurve();
+    std::vector<Eigen::Vector2i>cluster_label_src = cid_source.GetClusterLabels();
+    std::vector<Eigen::Vector2i>cluster_label_tgt = cid_target.GetClusterLabels();
+
     std::vector<Eigen::Vector2d> std_params;
     bool use_nurbs_strategy = true;
     std::vector<Eigen::Matrix4f>similar_transformation;
     similar_transformation.reserve(2);
     int repeat_counter = 2;
 
-    double gSize = 1.0 / 128;
+    double gSize = 1.0 / 128.0;
     std::vector<Eigen::Vector2d> st_param = cid_source.GetInitialParameters();
     cParameterGrid cParam(gSize,
         /* point accessor */
@@ -760,7 +765,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 
                 if (_write)
                 {
-                    std::string filePath = "X:/staff/SDutta/GlobalRegistration/";
+                    std::string filePath = "Z:/staff/SDutta/GlobalRegistration/";
                     char subfile[100], subImg[100], subImgTar[100], subTarFile[100];
                     sprintf(subfile, "%d_src_descriptor",source_basic_index);
                     sprintf(subImg, "%d_src_img.bmp",source_basic_index);
@@ -770,7 +775,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 
                     std::string CloudName = filePath + subfile;
                     cid_source.ReconstructPointCloud();
-                   // cid_source.WritePointCloud(CloudName);
+                    cid_source.WritePointCloud(CloudName);
 
                     //write points from descriptos -> to verify the contents :sanity check
                     /*std::string desc_source_file_name = filePath + "desc_source";
@@ -924,7 +929,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                     /////////////Create Descriptor @ max resolution/////////////////////
                     CirconImageDescriptor cid_source_max(input_source, division_row, division_col, 
                         cid_source.GetHeightDivision(), src_cloud_parameter,
-                        *nbs_src, *ncs_src);
+                        nbs_src, ncs_src,cluster_label_src);
                     PointNormalType src_corres_at_max = max_measure.point_of_interest;
                     cid_source_max.SetBasicPointIndex(max_measure.point_index);
                     cid_source_max.SetMaximumAverageDistance(avg_dist);
@@ -940,7 +945,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                     auto startItr = std::chrono::high_resolution_clock::now();
                     std::cout << " source transformation at max:" << "\n" << T2 << std::endl;
                     std::cout << " target transformation at max" << "\n" << T1.inverse() << std::endl;
-                    std::cout << " rotation transformation@ 256 x 256:" << "\n" << T2_T1 << std::endl;
+                    std::cout << " rotation transformation@" << division_row << "X" << division_col << "\n" << T2_T1 << std::endl;
                     Final_Transformation = T1.inverse()* T2_T1 *  T2;
                    
                     Eigen::Matrix4f delta_transform = Final_Transformation *  Tg.inverse();
@@ -1001,8 +1006,8 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
                                     std::string ImageName = filePath + "best.bmp";
                                     std::string CloudName = filePath + "best_cloud";
   
-                                    std::cout << "Target Index:" << target_basic_index << "," << "source_index:"
-                                        << max_measure.point_of_interest << std::endl;
+                                   /* std::cout << "Target Index:" << target_basic_index << "," << "source_index:"
+                                        << max_measure.point_of_interest << std::endl;*/
 
                                     std::string CorresName = filePath + "src_corres_best_found";
                                     WritePointCloud(feature_points, CorresName);
@@ -1124,7 +1129,7 @@ Eigen::Matrix4f CirconCorrespondence::ComputeTransformation()
 
     }
    // std::cout << "Target Index:" << tc_corres << "," << "source_index:" << sc_corres << std::endl;
-    std::string fileName = "X:/staff/SDutta/GlobalRegistration/column_half";
+    std::string fileName = "Z:/staff/SDutta/GlobalRegistration/column_half";
     WritePointCloud(feature_points, fileName);
    // Final_Transformation = T1.inverse()* T2_T1 * T2;
     std::cout << "Target Index:" << target_basic_index << "," << "source_index:" << max_measure.point_of_interest << std::endl;
@@ -1517,7 +1522,7 @@ void CirconCorrespondence ::PrepareDescriptor(CirconImageDescriptor& cid, PointN
 
     if (use_nurbs_strategy)
     {
-        CUniformGrid2D cGrid2D(cid.GetAverageDist(),
+        CUniformGrid2D cGrid2D( cid.GetAverageDist(),
             /* point accessor */
             [&pTarget](Eigen::Vector2d *out_pnt, double *out_attrib, size_t idx) -> bool
         {
@@ -1541,7 +1546,7 @@ void CirconCorrespondence ::PrepareDescriptor(CirconImageDescriptor& cid, PointN
         double executeopto = std::chrono::duration_cast<
             std::chrono::duration<double, std::milli>>(endopto - startopto).count();
         executeopto = executeopto / double(1000);
-        if (debug)
+        if (debug) //debug
             std::cout << " Descriptor time:" << executeopto << std::endl;
         
     }
@@ -1744,7 +1749,9 @@ CirconImageDescriptor CirconCorrespondence::TransformCirconDescriptor(const Poin
   /* CloudPtr cloud =  Construct2DCloudForKdtreeSearch(transformed_descriptor.GetoriginalCloud(), transformed_descriptor.GetTransformation());
     transformed_descriptor.Set2DCloud(cloud);*/
   // transformed_descriptor.SetUpResolutionCount(up_resolution_count);
-    transformed_descriptor.CreateSecondaryDescriptor(pt,cParam_Source);
+    CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
+    pcl::transformPointCloudWithNormals(*original_src_cloud_with_normal, *pTarget, transformed_descriptor.GetTransformation());
+    transformed_descriptor.CreateSecondaryDescriptor(pt,cParam_Source,pTarget);
 
     return transformed_descriptor;
 }
@@ -1883,7 +1890,7 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
 
         float updated_sm = ComputeMaximumRotationShiftParameter(new_secondary_image, tar_image, secondary_max_shift_image,
             secondary_mage_point_index_map, desc_content, secondary_rot_idx, second_cell_idx);
-
+        
 #pragma omp critical 
         if (updated_sm > secondary_max_measure.similarity_value)//updated_sm >= sm
         {
@@ -1990,6 +1997,7 @@ void CirconCorrespondence::CompareDescriptor(const std::vector<std::vector<float
         std::chrono::duration<double, std::milli>>(endmove - startmove).count();
     executemove = executemove / double(1000);
     //  std::cout << " move time:" << executemove << std::endl;
+  
    std::cout << "max_rotation_index" << "@" << division_row << "=" << max_measure.rotation_index << std::endl;
     /*  auto startmove = std::chrono::high_resolution_clock::now();
       similarity_measures_content = std::move(similarity_measure);

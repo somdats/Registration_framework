@@ -23,8 +23,10 @@ class REG3D_API CirconCorrespondence : public CorrespondenceEstimator::ICorrespo
 public:
     CirconCorrespondence(CloudWithoutType sourceCloud, CloudWithoutType targetCloud, int div_row, int div_col, int height_division,
         std::vector<Eigen::Vector2d> src_st, std::vector<Eigen::Vector2d> tgt_st, int nr_resolution = 4, int col_search = 32, 
-        const ON_NurbsSurface &surface_fit = ON_NurbsSurface(), const ON_NurbsCurve &curve_fit = ON_NurbsCurve(),
-        const ON_NurbsSurface &surface_fit_tgt = ON_NurbsSurface(), const ON_NurbsCurve &curve_fit_tgt = ON_NurbsCurve(),
+        const std::vector<ON_NurbsSurface> &surface_fit = { ON_NurbsSurface() }, const std::vector<ON_NurbsCurve> &curve_fit = { ON_NurbsCurve() },
+        const std::vector<ON_NurbsSurface> &surface_fit_tgt = { ON_NurbsSurface() }, const std::vector<ON_NurbsCurve> &curve_fit_tgt = { ON_NurbsCurve() },
+        std::vector<Eigen::Vector2i>cluster_labels_src = {Eigen::Vector2i(-1,-1)},
+        std::vector<Eigen::Vector2i>cluster_labels_tgt = { Eigen::Vector2i(-1,-1) },
         bool write_data = false, float rho = 1.0f, float lambda = 1.0f, bool poi = false) :
         input_source(sourceCloud),
         input_target(targetCloud),
@@ -32,8 +34,8 @@ public:
         lambda_(lambda),
         division_col(div_col),
         division_row(div_row),
-        cid_source(sourceCloud, div_row, div_col, height_division,src_st, surface_fit, curve_fit, col_search),
-        cid_target(targetCloud, div_row, div_col, height_division,tgt_st, surface_fit_tgt, curve_fit_tgt, col_search),
+        cid_source(sourceCloud, div_row, div_col, height_division,src_st, surface_fit, curve_fit, cluster_labels_src, col_search),
+        cid_target(targetCloud, div_row, div_col, height_division,tgt_st, surface_fit_tgt, curve_fit_tgt, cluster_labels_tgt, col_search),
         basic_descriptor(poi),
         num_resolution(nr_resolution),
         nr_search_col(col_search),
@@ -245,6 +247,8 @@ int &rotation_idx, int &secondary_dsc_posn);
      const float &max_averg_dist);
  static void SampleDataUniformly(const CloudWithoutType &pc, const float &gSize, const std::string &OutPutFileName);
  void setDebug(const bool &debug_) { debug = debug_; };
+
+   
    
 
 
@@ -298,5 +302,7 @@ protected:
     cParameterGrid cParam_target;
     std::vector <CirconCorrespondence::Measure> similarity_measures_content;
     bool debug;
+
+  
     
 };

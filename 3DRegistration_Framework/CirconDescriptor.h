@@ -149,8 +149,13 @@ class REG3D_API CirconImageDescriptor/*: public FeatureEstimators::IFeature*/
 public:
     CirconImageDescriptor(){}
    // ~CirconImageDescriptor();
-    CirconImageDescriptor(CloudWithoutType &inputCloud, int division_row, int division_col, int height_division, std::vector<Eigen::Vector2d> st_param = {Eigen::Vector2d(-1.0,-1.0)}, const ON_NurbsSurface &surface_fit = ON_NurbsSurface(),
-        const ON_NurbsCurve &curve_fit = ON_NurbsCurve(), int max_search = 16) :
+    CirconImageDescriptor(CloudWithoutType &inputCloud, int division_row, int division_col, int height_division, 
+        std::vector<Eigen::Vector2d> st_param = {Eigen::Vector2d(-1.0,-1.0)}, 
+        const std::vector<ON_NurbsSurface> &surface_fit = { ON_NurbsSurface() },
+        const std::vector<ON_NurbsCurve> &curve_fit = { ON_NurbsCurve() }, 
+        std::vector<Eigen::Vector2i>cluster_labels_src = { Eigen::Vector2i(-1,-1) },
+      
+        int max_search = 16) :
         inputCloud(inputCloud),
         num_division_row(division_row), 
         num_division_col(division_col),
@@ -164,6 +169,8 @@ public:
         st_params(st_param),
         kdTree(new pcl::KdTreeFLANN<PointType>),
         Cloud2D(new pcl::PointCloud<PointType>),
+        Cluster_labels(cluster_labels_src),
+       
         original_cloud_with_normal(new pcl::PointCloud <PointNormalType>)
     {
         pcl::fromPCLPointCloud2(*inputCloud, *original_cloud_with_normal);
@@ -214,9 +221,11 @@ public:
     float GetRadiusFromCloud();  // useful for computing radial resolution
     void SetMaximumRadius(float rad);
     std::vector<std::vector<_dV>> GetDescriptorContent();
-    void CreateSecondaryDescriptor(const PointNormalType /*Eigen::VectorXd*/ &pt, const cParameterGrid & pGrid);
-    std::unique_ptr<ON_NurbsSurface> GetNurbsSurface();
-    std::unique_ptr<ON_NurbsCurve> GetNurbsCurve();
+    void CreateSecondaryDescriptor(const PointNormalType /*Eigen::VectorXd*/ &pt, const cParameterGrid & pGrid, const CloudWithNormalPtr
+        &pTarget);
+    std::vector<ON_NurbsSurface> GetNurbsSurface();
+    std::vector<ON_NurbsCurve> GetNurbsCurve();
+    std::vector<Eigen::Vector2i> GetClusterLabels();
     void SetNurbsSurfaceAndCurve(const ON_NurbsSurface &nbs);
    // nb_surface(inputCloud);
     static Eigen::Matrix4f ConstructLocalCoordinateAxes(CirconImageDescriptor &cid, PointNormalType &axis_point);
@@ -241,6 +250,7 @@ public:
    void GetRangeForImage(float &max, float &min);
   
 protected:
+    std::vector<Eigen::Vector2i>Cluster_labels;
     CloudWithoutType inputCloud;
     std::vector<std::pair<UVData<float>, float>>circon_data;  // stores values at each image indices
     std::map<int, size_t>index_index_map;  // stores image index corresponding to actual point index 
@@ -270,8 +280,8 @@ protected:
     int basic_cell_index;
     float max_radius;
     std::vector<std::vector<_dV>>descriptor_content;
-    ON_NurbsSurface nb_surface;
-    ON_NurbsCurve   nb_curve;
+    std::vector<ON_NurbsSurface> nb_surface;
+    std::vector<ON_NurbsCurve>   nb_curve;
     int no_col_search;
     surface::CloudBoundingBox bbs;
     std::vector<std::map<float, int>>vector_of_maps;
@@ -283,6 +293,7 @@ protected:
     bool high_res_flag = false;
     int up_resolution_count = 16;
    // cParameterGrid _pGrid;
- 
+    std::vector<std::unique_ptr<ON_NurbsSurface>>TransformNurbSurfacesInDescriptorFrame(const std::vector<ON_NurbsSurface>& nb_surface,
+        const Eigen::Matrix4d &Wl);
 };
 

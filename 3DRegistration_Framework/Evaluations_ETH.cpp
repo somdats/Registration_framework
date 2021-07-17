@@ -600,6 +600,7 @@ void Evaluations::Reset()
   CloudWithoutType Evaluation_Ext::TransformView(CloudWithoutType &inputCloud, Eigen::Matrix4f & Gt_Target, Eigen::Matrix4f &R_Transformation)
   {
       Eigen::Matrix4f Combine_Transform = Gt_Target.inverse() * R_Transformation;
+      std::cout << "GroundTruth Transform:\n" << Combine_Transform << std::endl;
       CloudWithoutType transformed_cloud = tool::TransFormationOfCloud(inputCloud, Combine_Transform);
       return transformed_cloud;
  }

@@ -62,6 +62,7 @@ CirconImageDescriptor& CirconImageDescriptor:: operator=(const CirconImageDescri
     avgpoint_dist = cid.avgpoint_dist;
     high_res_flag = cid.high_res_flag;
     up_resolution_count = cid.up_resolution_count;
+    Cluster_labels = cid.Cluster_labels;
    // kdTree = cid.kdTree;
     return *this;
 }
@@ -105,6 +106,7 @@ CirconImageDescriptor :: CirconImageDescriptor(const CirconImageDescriptor &cid)
     avgpoint_dist = cid.avgpoint_dist;
     high_res_flag = cid.high_res_flag;
     up_resolution_count = cid.up_resolution_count;
+    Cluster_labels = cid.Cluster_labels;
     
   //  _pGrid = cid._pGrid;
    // kdTree = cid.kdTree;
@@ -175,24 +177,31 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
 
     Eigen::Matrix4d tfs = Eigen::Matrix4d::Identity();
     Eigen::Matrix4f temp_wl = WorldLocalTransformation.inverse();
-    std::unique_ptr<ON_NurbsSurface> nb_surface_tfs = surface::cNurbsSurface::TransformControlPointsOfNurbsSurface(nb_surface, WorldLocalTransformation.cast<double>()); //
 
-    surface::Ray_Intersect r_it(*nb_surface_tfs);
+    // tranform nurb surfaces to local frame
+    std::vector<std::unique_ptr<ON_NurbsSurface>> nb_surface_tfs = TransformNurbSurfacesInDescriptorFrame(nb_surface,
+        WorldLocalTransformation.cast<double>());
+    //std::unique_ptr<ON_NurbsSurface> nb_surface_tfs 
+    //    = surface::cNurbsSurface::TransformControlPointsOfNurbsSurface(nb_surface,
+    //    WorldLocalTransformation.cast<double>()); //
+
+    /*surface::Ray_Intersect r_it(*nb_surface_tfs);
     r_it.x0 = nb_surface.Knot(0, 0);
     r_it.x1 = nb_surface.Knot(0, nb_surface.KnotCount(0) - 1);
     r_it.w = r_it.x1 - r_it.x0;
     r_it.y0 = nb_surface.Knot(1, 0);
     r_it.y1 = nb_surface.Knot(1, nb_surface.KnotCount(1) - 1);
-    r_it.h = r_it.y1 - r_it.y0;
+    r_it.h = r_it.y1 - r_it.y0;*/
     Eigen::Vector3d a0, a1;
     double scale;
-    surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(nb_curve, a0, a1, scale);
+   // surface::ComputeBoundingBoxAndScaleUsingNurbsCurve(nb_curve, a0, a1, scale);
     
     float  min_value = INFINITY;
     float  max_value = -INFINITY;
     double total_trim_time = 0; double total_eval_time = 0;
     //
     int countItr = 0;
+    int ray_intersector = 1000;
     //#pragma omp parallel for
     for (int i = 0; i < num_division_row; ++i)
     {
@@ -214,9 +223,28 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
             {
                 for (int itr = 0; itr < indices_list.size(); ++itr)
                 {
+                    // get the cluster to which the surface belongs
                     int pt_idx = indices_list[itr];
+                    int ci;
+                    Eigen::Vector2i cluster_pt = Cluster_labels[pt_idx];
+                    if (pt_idx == cluster_pt(0))
+                        ci = cluster_pt(1);
+                    else
+                        std::cout << "Wrong Index:" << cluster_pt(0) << std::endl;
+                    //get the corresponding nurb surface and transform it into local frame;
+                    // initiliaze the ray interesection with the transformed surface
+                    surface::Ray_Intersect r_it(*nb_surface_tfs[ci]);
+                    r_it.x0 = nb_surface[ci].Knot(0, 0);
+                    r_it.x1 = nb_surface[ci].Knot(0, nb_surface[ci].KnotCount(0) - 1);
+                    r_it.w = r_it.x1 - r_it.x0;
+                    r_it.y0 = nb_surface[ci].Knot(1, 0);
+                    r_it.y1 = nb_surface[ci].Knot(1, nb_surface[ci].KnotCount(1) - 1);
+                    r_it.h = r_it.y1 - r_it.y0;
+                   
+
                     r_it.xyz.head<2>() = Eigen::Vector2d(x, y);
                     r_it.init_param = st_params[pt_idx];
+
                     Eigen::Vector2d optim_parameter;
                     if (true) // col_reduced
                     {
@@ -227,23 +255,30 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
                         //  bool inside = surface::TrimInputSurfaceUsingCurveBoundary(optim_parameter, *nb_surface_tfs, 
                          //     nb_curve, a0, a1, scale);
                         bool inside = _pGrid.query(optim_parameter);
+
                         auto end = std::chrono::high_resolution_clock::now();
                         double trim_time = std::chrono::duration_cast<
                             std::chrono::duration<double, std::milli>>(end - start).count();
                         trim_time = trim_time / double(1000);
+
                         /*if (trim_time >= 0.001)
                             std::cout << " optimization time per cell:" << trim_time << std::endl;*/
                         Eigen::Vector3d vec3[3];
                         if (inside)
                         {
                             auto startopto = std::chrono::high_resolution_clock::now();
-                            nb_surface_tfs->Evaluate(optim_parameter(0), optim_parameter(1), 1, 3, &vec3[0][0]);
+
+                            nb_surface_tfs[ci]->Evaluate(optim_parameter(0), optim_parameter(1), 1, 3, &vec3[0][0]);
+
                             auto endopto = std::chrono::high_resolution_clock::now();
+
                             double executeopto = std::chrono::duration_cast<
                                 std::chrono::duration<double, std::milli>>(endopto - startopto).count();
                             executeopto = executeopto / double(1000);
+
                             //  std::cout << " optimization time per cell:" << executeopto << std::endl;
                             error = (r_it.xyz.head<2>() - vec3[0].head<2>()).squaredNorm();
+
                             if (error < 1e-4)
                             {
                                 vec3[1].normalize();
@@ -265,6 +300,7 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
 
                                 pt_dash.getVector3fMap() = temp_wl.block<3, 3>(0, 0) * pt.getVector3fMap() +
                                     temp_wl.block<3, 1>(0, 3);
+
                                 pt_dash.getNormalVector3fMap() = temp_wl.block<3, 3>(0, 0) *  pt.getNormalVector3fMap();
                                 /*                    Eigen::VectorXf pt_dash = Eigen::VectorXf::Zero(6);
                                                 pt_dash.head<3>() = temp_wl.block<3, 3>(0, 0) * pt.head<3>().cast<float>() +
@@ -272,11 +308,13 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
                                                 pt_dash.tail<3>() = temp_wl.block<3, 3>(0, 0) * pt.tail<3>().cast<float>();*/
                                 if (true)
                                     Image2D.addCellAt(i, j, num_division_col, val);
+
                                 // temp_image2d.addCellAt(i, j, num_division_col, val);
                                 int linearized_cell_index = i * num_division_col + j;
 
                                 _dV data(/*i, j,*/cellSate::VALID, linearized_cell_index, pt_idx,
                                     val, optim_parameter, pt_dash/*.cast<double>()*/);
+
                                 temp_descriptor_content[i][j] = std::move(data);
                                 total_eval_time += executeopto;
                                 total_trim_time += trim_time;
@@ -380,6 +418,23 @@ void CirconImageDescriptor::ComputeFeature(const CUniformGrid2D &cGrid2D, const 
     descriptor_content = std::move(temp_descriptor_content);
     //Image2D = std::move(temp_image2d);
 
+}
+
+std::vector<std::unique_ptr<ON_NurbsSurface>>  CirconImageDescriptor::TransformNurbSurfacesInDescriptorFrame(const std::vector<ON_NurbsSurface>& nb_surface,
+    const Eigen::Matrix4d &Wl)
+{
+    std::vector<std::unique_ptr<ON_NurbsSurface>>nurb_surfaces_tfs;
+    if (nb_surface.size() > 0)
+    {
+        nurb_surfaces_tfs.reserve(nb_surface.size());
+        for (int i = 0 ; i < nb_surface.size(); i++)
+        {
+            std::unique_ptr<ON_NurbsSurface> nb_surface_tfs = surface::cNurbsSurface::TransformControlPointsOfNurbsSurface(nb_surface[i], Wl);
+            nurb_surfaces_tfs.emplace_back(std::move(nb_surface_tfs));
+        }
+
+    }
+    return nurb_surfaces_tfs;
 }
 void CirconImageDescriptor::ComputeFeature(int i)
 {
@@ -1033,24 +1088,25 @@ void CirconImageDescriptor::UpdateDeescriptor(const PointNormalType /*Eigen::Vec
     int num_rows_shift = std::round((theta * num_division_row) / (2 * M_PI));  //number of rows to shift
     rotation_index = num_rows_shift;
 }
-void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Eigen::VectorXd*/ &pt,const cParameterGrid &pGrid)
+void CirconImageDescriptor::CreateSecondaryDescriptor(const PointNormalType /*Eigen::VectorXd*/ &pt,const cParameterGrid &pGrid, const CloudWithNormalPtr
+&pTarget)
 {
     // query_index -> index of the 2d image linearized as 1d array of floats
     sigma_threshold = rad_resolution / 16.0;  // set up threshold for non valid pts
 
 
    
-    CloudWithoutType transformed_cloud = TransformPointToLocalFrame();
+  //  CloudWithoutType transformed_cloud = TransformPointToLocalFrame();
 
-    CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
-    pcl::fromPCLPointCloud2(*transformed_cloud, *pTarget);
+   // CloudWithNormalPtr pTarget(new pcl::PointCloud <PointNormalType>);
+  //  pcl::fromPCLPointCloud2(*transformed_cloud, *pTarget);
 
     Eigen::Vector3f min_pt;
     Eigen::Vector3f max_pt;
    // float diag_length1 = tool::ComputeOrientedBoundingBoxOfCloud(pTarget, min_pt, max_pt);
  //  pcl::transformPointCloudWithNormals(*original_cloud_with_normal, *pTarget, WorldLocalTransformation);
    // float height =  ComputeheightFromPointCloud(pTarget);
-    CUniformGrid2D cGrid2D( avgpoint_dist,
+    CUniformGrid2D cGrid2D(avgpoint_dist,
         /* point accessor */
         [&pTarget](Eigen::Vector2d *out_pnt, double *out_attrib, size_t idx) -> bool
     {
@@ -1185,19 +1241,24 @@ std::vector<std::vector<_dV>>CirconImageDescriptor::GetDescriptorContent()
     return descriptor_content;
 }
 
-std::unique_ptr<ON_NurbsSurface> CirconImageDescriptor::GetNurbsSurface()
+std::vector<ON_NurbsSurface> CirconImageDescriptor::GetNurbsSurface()
 {
-    return std::make_unique<ON_NurbsSurface>(nb_surface);
+    return nb_surface;
 }
 
-std::unique_ptr<ON_NurbsCurve> CirconImageDescriptor::GetNurbsCurve()
+std::vector<ON_NurbsCurve> CirconImageDescriptor::GetNurbsCurve()
 {
-    return std::make_unique<ON_NurbsCurve>(nb_curve);
+    return nb_curve;
 }
 void CirconImageDescriptor::SetNurbsSurfaceAndCurve(const ON_NurbsSurface &nbs)
 {
-    nb_surface = nbs;
+   // nb_surface = nbs;
  
+}
+
+std::vector<Eigen::Vector2i>CirconImageDescriptor::GetClusterLabels()
+{
+    return Cluster_labels;
 }
 
 CirconImage::CirconImage(int columns, int rows)

@@ -818,22 +818,25 @@ void cNurbsSurface::CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, 
   double y0 = nurb.Knot(1, 0);
   double y1 = nurb.Knot(1, nurb.KnotCount(1) - 1);
   double h = y1 - y0;
-  double dx = w / double(segX);
-  double dy = h / double(segY);
-  Eigen::Vector2d st;
+  
+  
   Eigen::Vector3d a0, a1;
   pcl::on_nurbs::NurbsTools::computeBoundingBox(Curve, a0, a1);
   double rScale = 1.0 / pcl::on_nurbs::NurbsTools::computeRScale(a0, a1);
 
-  for (unsigned j = 0; j < segY; j++)
+  for (int j = 0; j < segY; j++)
   {
-      for (unsigned i = 0; i < segX; i++)
+      for (int i = 0; i < segX; i++)
       {
+          Eigen::Vector2d st;
+          double dx = w / double(segX);
+          double dy = h / double(segY);
           st.x() = x0 + double(i) * dx;
           st.y() = y0 + double(j) * dy;
           Eigen::Vector3d vec3[3];
           if (st.x() >= x0 && st.x() <= x1 &&  st.y() >= y0 &&  st.y() <= y1)
           {
+
               nurb.Evaluate(st.x(), st.y(), 1, 3, &vec3[0][0]);
               vec3[1].normalize();
               vec3[2].normalize();
@@ -860,10 +863,17 @@ void cNurbsSurface::CreateVerticesFromNurbsSurface(const ON_NurbsSurface &nurb, 
               {
                   cloud->push_back(pt);
                   st_params.emplace_back(st);
+                
+                  
               }
           }
       }
   }
+  //auto end_fit = std::chrono::high_resolution_clock::now();
+  //double execute = std::chrono::duration_cast<
+  //    std::chrono::duration<double, std::milli>>(end_fit - start_fit).count();
+  //execute = execute / double(1000);
+  //std::cout << " total vertices generation time:" << execute << "sec" << std::endl;
 }
 
 Eigen::VectorXd cNurbsSurface::ComputeClosetPointOnNurbSurface(const Eigen::VectorXd &pt_interest, const ON_NurbsSurface &ns,
